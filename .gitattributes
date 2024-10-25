@@ -1,0 +1,16 @@
+# Default: LF for all text files
+* text=auto eol=lf
+
+# Windows-specific files need CRLF
+*.{cmd,[cC][mM][dD]} text eol=crlf
+*.{bat,[bB][aA][tT]} text eol=crlf
+
+# Code files
+*.py text diff=python
+*.pyw text diff=python
+
+# Documentation and data
+*.ipynb text
+*.txt text
+*.md text diff=markdown
+*.markdown text diff=markdown

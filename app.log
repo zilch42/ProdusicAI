@@ -1,0 +1,40 @@
+2024-10-28 08:58:13,101 - INFO - Starting initialize_rag
+2024-10-28 08:58:13,101 - INFO - Loading documents from ideas.csv
+2024-10-28 08:58:13,103 - INFO - Starting update_youtube_links
+2024-10-28 08:58:13,105 - INFO - Saved updated ideas.csv
+2024-10-28 08:58:13,105 - INFO - Completed update_youtube_links
+2024-10-28 08:58:17,780 - INFO - Creating vector store from documents
+2024-10-28 08:58:18,351 - INFO - Vector store creation complete
+2024-10-28 08:58:18,351 - INFO - Completed initialize_rag
+2024-10-28 08:58:18,351 - INFO - Starting music_production_chat
+2024-10-28 08:58:18,352 - INFO - Starting music production chat session
+2024-10-28 09:01:11,240 - INFO - Starting initialize_rag
+2024-10-28 09:01:11,240 - INFO - Loading documents from ideas.csv
+2024-10-28 09:01:11,242 - INFO - Starting update_youtube_links
+2024-10-28 09:01:11,243 - INFO - Saved updated ideas.csv
+2024-10-28 09:01:11,243 - INFO - Completed update_youtube_links
+2024-10-28 09:01:17,614 - INFO - Creating vector store from documents
+2024-10-28 09:01:18,196 - INFO - Vector store creation complete
+2024-10-28 09:01:18,197 - INFO - Completed initialize_rag
+2024-10-28 09:01:18,197 - INFO - Starting music_production_chat
+2024-10-28 09:01:18,197 - INFO - Starting music production chat session
+2024-10-28 09:15:09,130 - INFO - Starting initialize_rag
+2024-10-28 09:15:09,130 - INFO - Loading documents from ideas.csv
+2024-10-28 09:15:09,132 - INFO - Starting update_youtube_links
+2024-10-28 09:15:09,134 - INFO - Saved updated ideas.csv
+2024-10-28 09:15:09,134 - INFO - Completed update_youtube_links
+2024-10-28 09:15:15,036 - INFO - Creating vector store from documents
+2024-10-28 09:15:15,728 - INFO - Vector store creation complete
+2024-10-28 09:15:15,728 - INFO - Completed initialize_rag
+2024-10-28 09:15:15,728 - INFO - Starting music_production_chat
+2024-10-28 09:15:15,728 - INFO - Starting music production chat session
+2024-10-28 09:20:02,458 - INFO - Starting initialize_rag
+2024-10-28 09:20:02,458 - INFO - Loading documents from ideas.csv
+2024-10-28 09:20:02,461 - INFO - Starting update_youtube_links
+2024-10-28 09:20:02,462 - INFO - Saved updated ideas.csv
+2024-10-28 09:20:02,462 - INFO - Completed update_youtube_links
+2024-10-28 09:20:07,245 - INFO - Creating vector store from documents
+2024-10-28 09:20:07,832 - INFO - Vector store creation complete
+2024-10-28 09:20:07,832 - INFO - Completed initialize_rag
+2024-10-28 09:20:07,832 - INFO - Starting music_production_chat
+2024-10-28 09:20:07,832 - INFO - Starting music production chat session

@@ -1,56 +1,60 @@
-import autogen
+from langchain.prompts import ChatPromptTemplate
+from langchain.schema import HumanMessage, SystemMessage
+from langchain_openai import AzureChatOpenAI
 from dotenv import load_dotenv
 import os
-
 
 # Load environment variables
 load_dotenv()
 
-# Define agent configurations
-config_list = [
-    {
-        "model": "gpt-4o",
-        "api_type": "azure",
-        "base_url": os.getenv("AZURE_OPENAI_ENDPOINT"),
-        "api_version": os.getenv("AZURE_OPENAI_API_VERSION"),
-        "api_key": os.getenv("AZURE_OPENAI_API_KEY"),
+llm = AzureChatOpenAI(
+    openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+    azure_deployment="gpt-4o",
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+)
+
+
+# Combined specialist definitions with their temperatures and system messages
+SPECIALISTS = {
+    "composer": {
+        "temperature": 0.7,  # More creative for composition suggestions
+        "system_message": SystemMessage(content="You are an expert music composer. Provide advice on composition, arrangement, and songwriting.")
+    },
+    "mixing_engineer": {
+        "temperature": 0.3,  # More precise for technical mixing advice
+        "system_message": SystemMessage(content="You are an expert mixing engineer. Provide advice on mixing, EQ, compression, and other audio processing techniques.")
+    },
+    "sound_designer": {
+        "temperature": 0.8,  # Very creative for sound design ideas
+        "system_message": SystemMessage(content="You are an expert sound designer. Provide advice on synthesizer programming, sample manipulation, and creating unique sounds.")
+    },
+    "lyricist": {
+        "temperature": 0.7,  # Creative but structured for lyric writing
+        "system_message": SystemMessage(content="You are an expert lyricist and songwriter. Provide advice on writing compelling lyrics, developing themes and narratives, crafting hooks, and ensuring lyrics flow well with the music.")
+    },
+    "project_manager": {
+        "temperature": 0.4,  # More focused for project coordination
+        "system_message": SystemMessage(content="You are a music project manager. Coordinate the efforts and provide overall guidance on the music production process.")
     }
-]
+}
 
-# Create agents
-user_proxy = autogen.UserProxyAgent(
-    name="Human",
-    system_message="A human music producer seeking advice and ideas.",
-    code_execution_config={"last_n_messages": 2, "work_dir": "music_workspace"},
-)
-
-composer_agent = autogen.AssistantAgent(
-    name="Composer",
-    system_message="You are an expert music composer. Provide advice on composition, arrangement, and songwriting.",
-    llm_config={"config_list": config_list},
-)
-
-mixing_engineer = autogen.AssistantAgent(
-    name="MixingEngineer",
-    system_message="You are an expert mixing engineer. Provide advice on mixing, EQ, compression, and other audio processing techniques.",
-    llm_config={"config_list": config_list},
-)
-
-sound_designer = autogen.AssistantAgent(
-    name="SoundDesigner",
-    system_message="You are an expert sound designer. Provide advice on synthesizer programming, sample manipulation, and creating unique sounds.",
-    llm_config={"config_list": config_list},
+def get_specialist(query):
+    """Determine which specialist should handle the query"""
+    routing_prompt = ChatPromptTemplate.from_messages([
+        SystemMessage(content="You are a project coordinator. Your job is to route queries to the appropriate specialist."),
+        HumanMessage(content=f"""Based on this query: "{query}"
+        
+        Determine which specialist would be most appropriate:
+        - composer: For composition, arrangement, and music theory
+        - mixing_engineer: For audio processing, mixing, mastering and sound balancing
+        - sound_designer: For audio synthesis, sound creation, and sonic textures
+        - lyricist: For writing lyrics, themes, hooks and song narratives
+        - project_manager: For project coordination or unclear queries
+        
+        Respond only with the role key, nothing else.""")
+    ])
     
-)
-
-lyrics_agent = autogen.AssistantAgent(
-    name="LyricsAgent",
-    system_message="You are an expert lyricist and songwriter. Provide advice on writing compelling lyrics, developing themes and narratives, crafting hooks, and ensuring lyrics flow well with the music.",
-    llm_config={"config_list": config_list},
-)
-
-project_manager = autogen.AssistantAgent(
-    name="ProjectManager",
-    system_message="You are a music project manager. Coordinate the efforts of the other agents and provide overall guidance on the music production process.",
-    llm_config={"config_list": config_list},
-)
+    response = llm.invoke(routing_prompt.messages)
+    specialist = response.content.lower().strip()
+    return specialist if specialist in SPECIALISTS else "project_manager"

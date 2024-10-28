@@ -12,7 +12,7 @@ logger.handlers = []
 
 # Add file handler
 file_handler = RotatingFileHandler(
-    'app.log',  # This will create/append to app.log in your project directory
+    'app.log',  
     maxBytes=1024 * 1024,  # 1MB
     backupCount=5
 )

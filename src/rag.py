@@ -1,7 +1,7 @@
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain.schema import Document  # Add this import
-from logger import logger, log_function
+from logger import logger, log_function, log_rag_query
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
 import os
@@ -154,3 +154,15 @@ def update_youtube_links(df):
     logger.info("Saved updated ideas.csv")
 
     return df 
+
+@log_rag_query
+@log_function
+def query_rag(query, k=3):
+    """
+    Query the RAG system to find similar documents based on semantic search.
+    """
+    results = vectorstore.similarity_search(query, k=k)
+    return results
+
+# setup vectorstore
+vectorstore = initialize_rag()

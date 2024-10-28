@@ -38,3 +38,176 @@
 2024-10-28 09:20:07,832 - INFO - Completed initialize_rag
 2024-10-28 09:20:07,832 - INFO - Starting music_production_chat
 2024-10-28 09:20:07,832 - INFO - Starting music production chat session
+2024-10-28 10:31:18,473 - INFO - Starting initialize_rag
+2024-10-28 10:31:18,473 - INFO - Loading documents from ideas.csv
+2024-10-28 10:31:18,475 - INFO - Starting update_youtube_links
+2024-10-28 10:31:18,478 - INFO - Saved updated ideas.csv
+2024-10-28 10:31:18,478 - INFO - Completed update_youtube_links
+2024-10-28 10:31:24,274 - INFO - Creating vector store from documents
+2024-10-28 10:31:24,964 - INFO - Vector store creation complete
+2024-10-28 10:31:24,965 - INFO - Completed initialize_rag
+2024-10-28 10:31:24,965 - INFO - Starting music_production_chat
+2024-10-28 10:31:24,965 - INFO - ---------------------------------------------
+2024-10-28 10:31:24,965 - INFO - Starting music production chat session
+2024-10-28 10:36:04,866 - INFO - Starting initialize_rag
+2024-10-28 10:36:04,866 - INFO - Loading documents from ideas.csv
+2024-10-28 10:36:04,868 - INFO - Starting update_youtube_links
+2024-10-28 10:36:04,869 - INFO - Saved updated ideas.csv
+2024-10-28 10:36:04,869 - INFO - Completed update_youtube_links
+2024-10-28 10:36:10,651 - INFO - Creating vector store from documents
+2024-10-28 10:36:11,264 - INFO - Vector store creation complete
+2024-10-28 10:36:11,264 - INFO - Completed initialize_rag
+2024-10-28 10:36:11,264 - INFO - Starting music_production_chat
+2024-10-28 10:36:11,264 - INFO - ---------------------------------------------
+2024-10-28 10:36:11,265 - INFO - Starting music production chat session
+2024-10-28 10:44:06,803 - INFO - Starting initialize_rag
+2024-10-28 10:44:06,803 - INFO - Loading documents from ideas.csv
+2024-10-28 10:44:06,805 - INFO - Starting update_youtube_links
+2024-10-28 10:44:06,807 - INFO - Saved updated ideas.csv
+2024-10-28 10:44:06,807 - INFO - Completed update_youtube_links
+2024-10-28 10:44:11,673 - INFO - Creating vector store from documents
+2024-10-28 10:44:12,220 - INFO - Vector store creation complete
+2024-10-28 10:44:12,221 - INFO - Completed initialize_rag
+2024-10-28 10:44:12,221 - INFO - Starting music_production_chat
+2024-10-28 10:44:12,221 - INFO - ---------------------------------------------
+2024-10-28 10:44:12,221 - INFO - Starting music production chat session
+2024-10-28 10:44:24,807 - INFO - RAG Query - Input: what can i do with hihats
+2024-10-28 10:44:24,808 - INFO - Starting query_rag
+2024-10-28 10:44:24,871 - INFO - Completed query_rag
+2024-10-28 10:44:24,871 - INFO - RAG Query - Found 3 results
+2024-10-28 11:36:22,051 - INFO - Starting initialize_rag
+2024-10-28 11:36:22,052 - INFO - Loading documents from ideas.csv
+2024-10-28 11:36:22,053 - INFO - Starting update_youtube_links
+2024-10-28 11:36:22,055 - INFO - Saved updated ideas.csv
+2024-10-28 11:36:22,056 - INFO - Completed update_youtube_links
+2024-10-28 11:36:29,122 - INFO - Creating vector store from documents
+2024-10-28 11:36:29,788 - INFO - Vector store creation complete
+2024-10-28 11:36:29,788 - INFO - Completed initialize_rag
+2024-10-28 11:36:29,788 - INFO - Starting music_production_chat
+2024-10-28 11:36:29,788 - INFO - ---------------------------------------------
+2024-10-28 11:36:29,788 - INFO - Starting music production chat session
+2024-10-28 11:58:39,482 - INFO - RAG Query - Input: what can i do with hihats
+2024-10-28 11:58:39,482 - INFO - Starting query_rag
+2024-10-28 11:58:39,539 - INFO - Completed query_rag
+2024-10-28 11:58:39,539 - INFO - RAG Query - Found 3 results
+2024-10-28 14:20:42,514 - INFO - Starting initialize_rag
+2024-10-28 14:20:42,514 - INFO - Loading documents from ideas.csv
+2024-10-28 14:20:42,518 - INFO - Starting update_youtube_links
+2024-10-28 14:20:42,521 - INFO - Saved updated ideas.csv
+2024-10-28 14:20:42,521 - INFO - Completed update_youtube_links
+2024-10-28 14:20:49,662 - INFO - Creating vector store from documents
+2024-10-28 14:20:50,559 - INFO - Vector store creation complete
+2024-10-28 14:20:50,559 - INFO - Completed initialize_rag
+2024-10-28 14:22:58,725 - INFO - Starting initialize_rag
+2024-10-28 14:22:58,726 - INFO - Loading documents from ideas.csv
+2024-10-28 14:22:58,727 - INFO - Starting update_youtube_links
+2024-10-28 14:22:58,729 - INFO - Saved updated ideas.csv
+2024-10-28 14:22:58,729 - INFO - Completed update_youtube_links
+2024-10-28 14:23:03,356 - INFO - Creating vector store from documents
+2024-10-28 14:23:03,981 - INFO - Vector store creation complete
+2024-10-28 14:23:03,981 - INFO - Completed initialize_rag
+2024-10-28 14:25:33,357 - INFO - Starting initialize_rag
+2024-10-28 14:25:33,357 - INFO - Loading documents from ideas.csv
+2024-10-28 14:25:33,359 - INFO - Starting update_youtube_links
+2024-10-28 14:25:33,360 - INFO - Saved updated ideas.csv
+2024-10-28 14:25:33,360 - INFO - Completed update_youtube_links
+2024-10-28 14:25:38,404 - INFO - Creating vector store from documents
+2024-10-28 14:25:39,042 - INFO - Vector store creation complete
+2024-10-28 14:25:39,042 - INFO - Completed initialize_rag
+2024-10-28 14:26:53,222 - INFO - Starting initialize_rag
+2024-10-28 14:26:53,222 - INFO - Loading documents from ideas.csv
+2024-10-28 14:26:53,224 - INFO - Starting update_youtube_links
+2024-10-28 14:26:53,226 - INFO - Saved updated ideas.csv
+2024-10-28 14:26:53,226 - INFO - Completed update_youtube_links
+2024-10-28 14:26:55,160 - INFO - Starting initialize_rag
+2024-10-28 14:26:55,160 - INFO - Loading documents from ideas.csv
+2024-10-28 14:26:55,162 - INFO - Starting update_youtube_links
+2024-10-28 14:26:55,163 - INFO - Saved updated ideas.csv
+2024-10-28 14:26:55,163 - INFO - Completed update_youtube_links
+2024-10-28 14:26:59,810 - INFO - Creating vector store from documents
+2024-10-28 14:27:00,420 - INFO - Vector store creation complete
+2024-10-28 14:27:00,420 - INFO - Completed initialize_rag
+2024-10-28 14:27:17,280 - INFO - RAG Query - Input: What can I do with hihats in mixing 
+2024-10-28 14:27:17,280 - INFO - Starting query_rag
+2024-10-28 14:27:17,280 - ERROR - Error in query_rag: name 'vectorstore' is not defined
+2024-10-28 14:39:25,209 - INFO - Starting initialize_rag
+2024-10-28 14:39:25,209 - INFO - Loading documents from ideas.csv
+2024-10-28 14:39:25,211 - INFO - Starting update_youtube_links
+2024-10-28 14:39:25,212 - INFO - Saved updated ideas.csv
+2024-10-28 14:39:25,212 - INFO - Completed update_youtube_links
+2024-10-28 14:39:30,766 - INFO - Creating vector store from documents
+2024-10-28 14:39:31,348 - INFO - Vector store creation complete
+2024-10-28 14:39:31,348 - INFO - Completed initialize_rag
+2024-10-28 15:12:39,905 - INFO - Starting initialize_rag
+2024-10-28 15:12:39,905 - INFO - Loading documents from ideas.csv
+2024-10-28 15:12:39,907 - INFO - Starting update_youtube_links
+2024-10-28 15:12:39,908 - INFO - Saved updated ideas.csv
+2024-10-28 15:12:39,908 - INFO - Completed update_youtube_links
+2024-10-28 15:12:44,287 - INFO - Creating vector store from documents
+2024-10-28 15:12:44,894 - INFO - Vector store creation complete
+2024-10-28 15:12:44,895 - INFO - Completed initialize_rag
+2024-10-28 15:12:48,913 - INFO - Starting initialize_rag
+2024-10-28 15:12:48,913 - INFO - Loading documents from ideas.csv
+2024-10-28 15:12:48,915 - INFO - Starting update_youtube_links
+2024-10-28 15:12:48,916 - INFO - Saved updated ideas.csv
+2024-10-28 15:12:48,917 - INFO - Completed update_youtube_links
+2024-10-28 15:12:53,341 - INFO - Creating vector store from documents
+2024-10-28 15:12:53,901 - INFO - Vector store creation complete
+2024-10-28 15:12:53,902 - INFO - Completed initialize_rag
+2024-10-28 15:12:57,014 - INFO - Starting initialize_rag
+2024-10-28 15:12:57,014 - INFO - Loading documents from ideas.csv
+2024-10-28 15:12:57,016 - INFO - Starting update_youtube_links
+2024-10-28 15:12:57,017 - INFO - Saved updated ideas.csv
+2024-10-28 15:12:57,017 - INFO - Completed update_youtube_links
+2024-10-28 15:13:01,708 - INFO - Creating vector store from documents
+2024-10-28 15:13:02,317 - INFO - Vector store creation complete
+2024-10-28 15:13:02,317 - INFO - Completed initialize_rag
+2024-10-28 15:16:05,045 - INFO - Starting initialize_rag
+2024-10-28 15:16:05,046 - INFO - Loading documents from ideas.csv
+2024-10-28 15:16:05,047 - INFO - Starting update_youtube_links
+2024-10-28 15:16:05,048 - INFO - Saved updated ideas.csv
+2024-10-28 15:16:05,049 - INFO - Completed update_youtube_links
+2024-10-28 15:16:09,338 - INFO - Starting initialize_rag
+2024-10-28 15:16:09,339 - INFO - Loading documents from ideas.csv
+2024-10-28 15:16:09,340 - INFO - Starting update_youtube_links
+2024-10-28 15:16:09,341 - INFO - Saved updated ideas.csv
+2024-10-28 15:16:09,341 - INFO - Completed update_youtube_links
+2024-10-28 15:16:14,189 - INFO - Creating vector store from documents
+2024-10-28 15:16:14,748 - INFO - Vector store creation complete
+2024-10-28 15:16:14,748 - INFO - Completed initialize_rag
+2024-10-28 15:16:21,909 - INFO - Starting initialize_rag
+2024-10-28 15:16:21,909 - INFO - Loading documents from ideas.csv
+2024-10-28 15:16:21,910 - INFO - Starting update_youtube_links
+2024-10-28 15:16:21,912 - INFO - Saved updated ideas.csv
+2024-10-28 15:16:21,912 - INFO - Completed update_youtube_links
+2024-10-28 15:16:26,694 - INFO - Creating vector store from documents
+2024-10-28 15:16:27,197 - INFO - Vector store creation complete
+2024-10-28 15:16:27,197 - INFO - Completed initialize_rag
+2024-10-28 15:17:13,513 - INFO - Starting initialize_rag
+2024-10-28 15:17:13,513 - INFO - Loading documents from ideas.csv
+2024-10-28 15:17:13,515 - INFO - Starting update_youtube_links
+2024-10-28 15:17:13,516 - INFO - Saved updated ideas.csv
+2024-10-28 15:17:13,516 - INFO - Completed update_youtube_links
+2024-10-28 15:17:18,803 - INFO - Creating vector store from documents
+2024-10-28 15:17:19,338 - INFO - Vector store creation complete
+2024-10-28 15:17:19,338 - INFO - Completed initialize_rag
+2024-10-28 15:17:20,839 - INFO - Starting initialize_rag
+2024-10-28 15:17:20,839 - INFO - Loading documents from ideas.csv
+2024-10-28 15:17:20,841 - INFO - Starting update_youtube_links
+2024-10-28 15:17:20,842 - INFO - Saved updated ideas.csv
+2024-10-28 15:17:20,842 - INFO - Completed update_youtube_links
+2024-10-28 15:17:25,855 - INFO - Creating vector store from documents
+2024-10-28 15:17:26,375 - INFO - Vector store creation complete
+2024-10-28 15:17:26,375 - INFO - Completed initialize_rag
+2024-10-28 15:17:57,846 - INFO - Starting initialize_rag
+2024-10-28 15:17:57,846 - INFO - Loading documents from ideas.csv
+2024-10-28 15:17:57,848 - INFO - Starting update_youtube_links
+2024-10-28 15:17:57,849 - INFO - Saved updated ideas.csv
+2024-10-28 15:17:57,849 - INFO - Completed update_youtube_links
+2024-10-28 15:18:02,155 - INFO - Creating vector store from documents
+2024-10-28 15:18:02,766 - INFO - Vector store creation complete
+2024-10-28 15:18:02,767 - INFO - Completed initialize_rag
+2024-10-28 15:18:20,436 - INFO - RAG Query - Input: what can I do with hihats in mixing 
+2024-10-28 15:18:20,436 - INFO - Starting query_rag
+2024-10-28 15:18:20,494 - INFO - Completed query_rag
+2024-10-28 15:18:20,494 - INFO - RAG Query - Found 3 results

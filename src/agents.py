@@ -1,10 +1,15 @@
+import asyncio
+import os
+from dotenv import load_dotenv
+from langchain.output_parsers import CommaSeparatedListOutputParser
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_openai import AzureChatOpenAI
-from dotenv import load_dotenv
-import os
+from langchain.schema import HumanMessage
 
-# Load environment variables
+from logger import logger
+from rag import query_rag
+
 load_dotenv()
 
 llm = AzureChatOpenAI(
@@ -14,8 +19,6 @@ llm = AzureChatOpenAI(
     api_key=os.getenv("AZURE_OPENAI_API_KEY")
 )
 
-
-# Combined specialist definitions with their temperatures and system messages
 SPECIALISTS = {
     "composer": {
         "temperature": 0.7,  # More creative for composition suggestions
@@ -39,8 +42,47 @@ SPECIALISTS = {
     }
 }
 
+def filter_relevant_ideas(query, results):
+    """Filter RAG results to only those relevant to the query.
+    
+    Args:
+        query (str): The user's query
+        results (list): List of RAG results to filter
+        
+    Returns:
+        list: Filtered list containing only relevant results
+    """
+    output_parser = CommaSeparatedListOutputParser()
+    format_instructions = output_parser.get_format_instructions()
+    
+    relevance_prompt = ChatPromptTemplate.from_messages([
+        SystemMessage(content="You are a music production assistant. Your job is to determine which music production ideas are relevant to the query."),
+        HumanMessage(content=f"""Query: "{query}"
+
+        For each of these ideas, respond only with 'yes' or 'no' based on whether it is relevant to the query:
+
+        {[doc.page_content for doc in results]}
+        
+        {format_instructions}""")
+    ])
+    
+    relevance_response = llm.invoke(relevance_prompt.messages)
+    logger.info(f"LLM relevance response: {relevance_response.content}")
+    
+    relevant_flags = [r.strip().lower() == 'yes' for r in output_parser.parse(relevance_response.content)]
+    
+    return [doc for doc, is_relevant in zip(results, relevant_flags) if is_relevant]
+
+
 def get_specialist(query):
-    """Determine which specialist should handle the query"""
+    """Determine which specialist should handle the query.
+    
+    Args:
+        query (str): The user's query
+        
+    Returns:
+        str: Name of the chosen specialist
+    """
     routing_prompt = ChatPromptTemplate.from_messages([
         SystemMessage(content="You are a project coordinator. Your job is to route queries to the appropriate specialist."),
         HumanMessage(content=f"""Based on this query: "{query}"
@@ -58,3 +100,49 @@ def get_specialist(query):
     response = llm.invoke(routing_prompt.messages)
     specialist = response.content.lower().strip()
     return specialist if specialist in SPECIALISTS else "project_manager"
+
+
+
+class AgentManager:
+    def __init__(self):
+        pass
+
+    async def process_query(self, user_message):
+
+        IDEAS_BLURB = """
+The user has a database of previous ideas that they have collected from listening to other songs. 
+If they appear relevant to the query, please include them in your advice.
+You may also include other advice based on your specialization.
+
+Relevant context and ideas:
+
+"""
+        # Get relevant ideas from RAG
+        ideas = query_rag(user_message)
+        ideas = filter_relevant_ideas(user_message, ideas)
+
+        if len(ideas) > 0:
+            ideas_text="\n".join([f"- {doc.metadata['Technique']}: {doc.metadata['Description']}" for doc in ideas])
+            user_message += IDEAS_BLURB + ideas_text
+
+        # Determine specialist
+        specialist = get_specialist(user_message)
+        
+        # Create conversation chain
+        messages = [
+            SPECIALISTS[specialist]["system_message"],
+            HumanMessage(content=user_message)
+        ]
+
+        # Get response from specialist
+        response = await asyncio.to_thread(
+            llm.invoke,
+            messages,
+            temperature=SPECIALISTS[specialist]["temperature"]
+        )
+
+        return {
+            'rag_results': ideas,
+            'specialist': specialist,
+            'response': response.content
+        }

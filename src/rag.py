@@ -1,6 +1,6 @@
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
-from langchain.schema import Document  # Add this import
+from langchain.schema import Document  
 from logger import logger, log_function, log_rag_query
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
@@ -10,7 +10,7 @@ import numpy as np
 
 load_dotenv()
 
-# TODO is it using rag effectively?
+_vectorstore = None
 
 @log_function
 def initialize_rag():
@@ -29,7 +29,6 @@ def initialize_rag():
     logger.info("Loading documents from ideas.csv")
     df = pd.read_csv("ideas.csv").replace({np.nan:None})
     df = update_youtube_links(df)
-    df = df.drop(columns=['Timestamp'])
 
     # Text to be embedded 
     # Combine relevant columns into text for embedding
@@ -52,16 +51,15 @@ def initialize_rag():
     return vectorstore
 
 
-def search_youtube_song(query: str, timestamp: str) -> str:
+def search_youtube_song(query: str) -> str:
     """
-    Search for a song on YouTube and return its URL with optional timestamp.
+    Search for a song on YouTube and return its URL.
     
     Args:
         query (str): The search query for the song
-        timestamp (str): Optional timestamp in 'MM:SS' format to append to the URL
         
     Returns:
-        str: YouTube video URL with timestamp if provided, None if no video found
+        str: YouTube video URL, None if no video found
         
     Raises:
         Exception: If there's an error during the YouTube API request
@@ -85,16 +83,7 @@ def search_youtube_song(query: str, timestamp: str) -> str:
         if search_response['items']:
             video_id = search_response['items'][0]['id']['videoId']
             video_url = f"https://www.youtube.com/watch?v={video_id}"
-            logger.info(f"Found YouTube video: {video_url}")
-
-            if timestamp:
-                try:
-                    minutes, seconds = map(int, str(timestamp).split(':'))
-                    t_seconds = minutes * 60 + seconds
-                    video_url += f"&t={t_seconds}"
-                except:
-                    logger.warning(f"Invalid timestamp: {timestamp}")
-                
+            logger.info(f"Found YouTube video: {video_url}")                
             return video_url
         else:
             logger.warning(f"No YouTube videos found for query: {query}")
@@ -105,6 +94,19 @@ def search_youtube_song(query: str, timestamp: str) -> str:
         raise
     finally:
         youtube.close()
+
+def convert_timestamp_to_yt(timestamp: str) -> str:
+    """
+    Convert a timestamp string to a URL parameter for YouTube.
+    """
+    try:
+        minutes, seconds = map(int, str(timestamp).split(':'))
+        t_seconds = minutes * 60 + seconds
+        ts = f"&amp;start={t_seconds}"
+        return ts
+    except:
+        logger.warning(f"Invalid timestamp: {timestamp}")
+        return ""
 
 @log_function
 def update_youtube_links(df):
@@ -155,14 +157,22 @@ def update_youtube_links(df):
 
     return df 
 
+
+def get_vectorstore():
+    """
+    Get or initialize the vectorstore singleton.
+    """
+    global _vectorstore
+    if _vectorstore is None:
+        _vectorstore = initialize_rag()
+    return _vectorstore
+
 @log_rag_query
 @log_function
 def query_rag(query, k=3):
     """
     Query the RAG system to find similar documents based on semantic search.
     """
+    vectorstore = get_vectorstore()
     results = vectorstore.similarity_search(query, k=k)
     return results
-
-# setup vectorstore
-vectorstore = initialize_rag()

@@ -105,44 +105,65 @@ def get_specialist(query):
 
 class AgentManager:
     def __init__(self):
-        pass
+        self.current_specialist = None
+        self.message_chain = []
 
-    async def process_query(self, user_message):
+    async def get_rag_results(self, user_message):
+        """Get relevant results from the RAG system."""
+        # Query the RAG system
+        raw_results = await query_rag(user_message)
+        
+        # Filter results for relevance
+        if raw_results:
+            return filter_relevant_ideas(user_message, raw_results)
+        return []
 
+    async def get_specialist_response(self, user_message, ideas):
         IDEAS_BLURB = """
-The user has a database of previous ideas that they have collected from listening to other songs. 
-If they appear relevant to the query, please include them in your advice.
-You may also include other advice based on your specialization.
+        The user has a database of previous ideas that they have collected from listening to other songs. 
+        If they appear relevant to the query, please include them in your advice.
+        You may also include other advice based on your specialization.
 
-Relevant context and ideas:
+        Relevant context and ideas:
+        """
 
-"""
-        # Get relevant ideas from RAG
-        ideas = query_rag(user_message)
-        ideas = filter_relevant_ideas(user_message, ideas)
-
+        # Add ideas context if available
         if len(ideas) > 0:
-            ideas_text="\n".join([f"- {doc.metadata['Technique']}: {doc.metadata['Description']}" for doc in ideas])
+            ideas_text = "\n".join([f"- {doc.metadata['Technique']}: {doc.metadata['Description']}" for doc in ideas])
             user_message += IDEAS_BLURB + ideas_text
 
-        # Determine specialist
-        specialist = get_specialist(user_message)
+        # Determine specialist - only if it's new or changed
+        new_specialist = get_specialist(user_message)
+        if self.current_specialist != new_specialist:
+            # Reset chain if specialist changes
+            self.message_chain = []
+            self.current_specialist = new_specialist
         
-        # Create conversation chain
-        messages = [
-            SPECIALISTS[specialist]["system_message"],
+        # Add user message to chain
+        self.message_chain.append(
             HumanMessage(content=user_message)
-        ]
-
-        # Get response from specialist
-        response = await asyncio.to_thread(
-            llm.invoke,
-            messages,
-            temperature=SPECIALISTS[specialist]["temperature"]
         )
 
-        return {
-            'rag_results': ideas,
-            'specialist': specialist,
-            'response': response.content
-        }
+        # Create conversation chain with full history
+        messages = [
+            SPECIALISTS[new_specialist]["system_message"],
+            *self.message_chain
+        ]
+
+        # Get streaming response from specialist
+        response_chunks = []
+        async for chunk in llm.astream(
+            messages,
+            temperature=SPECIALISTS[new_specialist]["temperature"]
+        ):
+            response_chunks.append(chunk.content)
+            # Include specialist info in the yielded data
+            yield {
+                'content': chunk.content,
+                'specialist': new_specialist
+            }
+        
+        full_response = ''.join(response_chunks)
+        self.message_chain.append(
+            SystemMessage(content=full_response)
+        )

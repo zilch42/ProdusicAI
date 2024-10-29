@@ -42,10 +42,10 @@ def log_function(func):
 
 def log_rag_query(func):
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    async def wrapper(*args, **kwargs):
         query = args[0] if args else kwargs.get('query', 'No query provided')
         logger.info(f"RAG Query - Input: {query}")
-        result = func(*args, **kwargs)
+        result = await func(*args, **kwargs)  # Await the coroutine
         logger.info(f"RAG Query - Found {len(result)} results")
         return result
     return wrapper

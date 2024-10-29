@@ -1,4 +1,4 @@
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain.schema import Document  
 from logger import logger, log_function, log_rag_query
@@ -8,6 +8,7 @@ import os
 import pandas as pd
 import numpy as np
 import hashlib
+import asyncio
 
 load_dotenv()
 
@@ -34,7 +35,7 @@ def initialize_rag():
             logger.info("Loading vector store from disk cache")
             embedding_model = HuggingFaceBgeEmbeddings(
                 model_name="BAAI/llm-embedder",
-                model_kwargs={"device": "cuda"},
+                model_kwargs={"device": "cpu"},
                 encode_kwargs={"normalize_embeddings": True},
             )
             return Chroma(persist_directory=persist_directory, embedding_function=embedding_model)
@@ -183,12 +184,12 @@ def update_youtube_links(df):
 
 @log_rag_query
 @log_function
-def query_rag(query, k=3):
+async def query_rag(query, k=3):
     """
     Query the RAG system to find similar documents based on semantic search.
     """
     global _vectorstore
-    results = _vectorstore.similarity_search(query, k=k)
+    results = await asyncio.to_thread(_vectorstore.similarity_search, query, k=k)
     return results
 
 # Initialize the vector store when the module loads

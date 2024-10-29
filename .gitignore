@@ -7,7 +7,12 @@ wheels/
 *.egg-info
 .cache
 
-# Virtual environments
-.venv
 
+.venv
 .env
+
+logos/
+
+app.log
+chroma_db/
+ideas_csv.hash

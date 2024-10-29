@@ -1,6 +1,8 @@
 from nicegui import ui
 from agents import AgentManager
 from rag import convert_timestamp_to_yt
+
+
 class MusicProductionUI:
     def __init__(self):
         self.chat_messages = []
@@ -22,6 +24,7 @@ class MusicProductionUI:
                 self.input = ui.input(placeholder='Ask me anything about music production...') \
                     .classes('w-full') \
                     .on('keydown.enter', self.handle_message)
+                # TODO apply animation on enter
                 ui.button('Send', on_click=self.handle_message) \
                     .classes('bg-blue-600 text-white')
 
@@ -32,6 +35,7 @@ class MusicProductionUI:
 
         # Clear input
         self.input.value = ''
+        spinner = ui.spinner('bars', size='8em')
 
         # Add user message to UI
         with self.messages_container:
@@ -69,3 +73,6 @@ class MusicProductionUI:
             with ui.card().classes('bg-blue-100'):
                 ui.label(f"{result['specialist'].replace('_', ' ').title()}:").classes('font-bold')
                 ui.markdown(result['response'])
+
+        spinner.delete()
+        

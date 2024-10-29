@@ -7,26 +7,40 @@ from dotenv import load_dotenv
 import os
 import pandas as pd
 import numpy as np
+import hashlib
 
 load_dotenv()
 
-_vectorstore = None
+@log_function
+def get_csv_hash():
+    """Calculate SHA-256 hash of ideas.csv"""
+    with open("ideas.csv", "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
 
 @log_function
 def initialize_rag():
     """
-    Initialize a RAG (Retrieval-Augmented Generation) system by creating a vector store from a CSV file.
-    
-    The function:
-    1. Loads data from 'ideas.csv'
-    2. Updates YouTube links for entries with songs
-    3. Creates document embeddings using HuggingFace BGE embeddings
-    4. Stores the embeddings in a Chroma vector store
-    
-    Returns:
-        Chroma: A vector store containing the embedded documents
+    Initialize a RAG system, using cached vector store if available and CSV hasn't changed.
     """
-    logger.info("Loading documents from ideas.csv")
+    csv_hash = get_csv_hash()
+    persist_directory = "chroma_db"
+    hash_file = "ideas_csv.hash"
+
+    # Check if we can use cached database
+    if os.path.exists(persist_directory) and os.path.exists(hash_file):
+        with open(hash_file, "r") as f:
+            stored_hash = f.read().strip()
+        if stored_hash == csv_hash:
+            logger.info("Loading vector store from disk cache")
+            embedding_model = HuggingFaceBgeEmbeddings(
+                model_name="BAAI/llm-embedder",
+                model_kwargs={"device": "cuda"},
+                encode_kwargs={"normalize_embeddings": True},
+            )
+            return Chroma(persist_directory=persist_directory, embedding_function=embedding_model)
+
+    # If we reach here, we need to create a new database
+    logger.info("Creating new vector store from ideas.csv")
     df = pd.read_csv("ideas.csv").replace({np.nan:None})
     df = update_youtube_links(df)
 
@@ -46,7 +60,17 @@ def initialize_rag():
     )
 
     logger.info("Creating vector store from documents")
-    vectorstore = Chroma.from_documents(documents, embedding_model)
+    vectorstore = Chroma.from_documents(
+        documents, 
+        embedding_model, 
+        persist_directory=persist_directory
+    )
+    vectorstore.persist()
+    
+    # Save the hash
+    with open(hash_file, "w") as f:
+        f.write(csv_hash)
+    
     logger.info("Vector store creation complete")
     return vectorstore
 
@@ -157,22 +181,16 @@ def update_youtube_links(df):
 
     return df 
 
-
-def get_vectorstore():
-    """
-    Get or initialize the vectorstore singleton.
-    """
-    global _vectorstore
-    if _vectorstore is None:
-        _vectorstore = initialize_rag()
-    return _vectorstore
-
 @log_rag_query
 @log_function
 def query_rag(query, k=3):
     """
     Query the RAG system to find similar documents based on semantic search.
     """
-    vectorstore = get_vectorstore()
-    results = vectorstore.similarity_search(query, k=k)
+    global _vectorstore
+    results = _vectorstore.similarity_search(query, k=k)
     return results
+
+# Initialize the vector store when the module loads
+logger.info("Initializing vector store on startup")
+_vectorstore = initialize_rag()

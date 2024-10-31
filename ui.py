@@ -1,7 +1,7 @@
 from nicegui import ui
-from agents import AgentManager
-from rag import convert_timestamp_to_yt
-from logger import NiceGuiLogElementCallbackHandler, nicegui_handler
+from src.agents import AgentManager
+from src.rag import convert_timestamp_to_yt, query_rag
+from src.logger import NiceGuiLogElementCallbackHandler, nicegui_handler
 
 def create_youtube_embed(url: str, timestamp: str = "") -> str:
     """Create an HTML iframe for a YouTube URL."""
@@ -36,6 +36,7 @@ def main():
     
     # Create callback handler with log element
     callback_handler = NiceGuiLogElementCallbackHandler(log_element)
+    # llm.callbacks = [callback_handler]
     
     # Connect the log element to both handlers
     nicegui_handler.set_log_element(log_element)
@@ -63,7 +64,7 @@ def main():
             spinner = ui.spinner(type='audio', size='3em')
             
         # First get RAG results
-        rag_results = await agent_manager.get_rag_results(user_message)
+        rag_results = await query_rag(user_message)
         
         # Show RAG results if any
         if len(rag_results) > 0:
@@ -85,6 +86,7 @@ def main():
                             else:
                                 ts = convert_timestamp_to_yt(doc.metadata.get('Timestamp'))
                                 ui.html(create_youtube_embed(link, ts))
+                            await ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
         else:
             message_container.remove(ideas_response)
         

@@ -8,8 +8,8 @@ from langchain.tools import StructuredTool
 from typing import Optional
 from pydantic import BaseModel
 
-from logger import logger
-from rag import query_rag, search_youtube_song
+from src.logger import logger
+from src.rag import query_rag, search_youtube_song
 
 load_dotenv()
 

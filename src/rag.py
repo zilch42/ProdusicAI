@@ -1,7 +1,8 @@
+import random
 from langchain_chroma import Chroma
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain.schema import Document  
-from logger import logger, log_function, log_rag_query
+from src.logger import logger, log_function, log_rag_query
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
 import os
@@ -189,8 +190,33 @@ async def query_rag(query, k=3):
     Query the RAG system to find similar documents based on semantic search.
     """
     global _vectorstore
-    results = await asyncio.to_thread(_vectorstore.similarity_search, query, k=k)
+    results = await _vectorstore.asimilarity_search(query, k=k)
     return results
+
+@log_function
+def get_random_by_category(category: str = None):
+    """
+    Get a random document from the RAG system matching a specific category.
+    
+    Args:
+        category (str): The category to filter by
+        
+    Returns:
+        Document: A random document from the specified category, or None if no matches
+    """
+    where = {"Category": category} if category else None
+    global _vectorstore
+    ids = _vectorstore.get(where=where, include=['documents']).get('ids', [])
+    if not ids:
+        logger.warning(f"No documents found for category: {category}")
+        return None
+    random_id = random.choice(ids)
+    record = _vectorstore.get(ids=random_id)
+    return record
+
+
+
+
 
 # Initialize the vector store when the module loads
 logger.info("Initializing vector store on startup")

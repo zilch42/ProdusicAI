@@ -1,11 +1,24 @@
 from nicegui import ui
 from agents import AgentManager
 from rag import convert_timestamp_to_yt
+from logger import NiceGuiLogElementCallbackHandler, nicegui_handler
+
+def create_youtube_embed(url: str, timestamp: str = "") -> str:
+    """Create an HTML iframe for a YouTube URL."""
+    video_id = url.split('=')[-1]
+    return f"""
+        <iframe 
+            width="560" height="315" 
+            src="https://www.youtube.com/embed/{video_id}?si=dTVYtHXBIJeY_EH-{timestamp}" 
+            title="YouTube video player" frameborder="0" 
+            allow="clipboard-write; encrypted-media; picture-in-picture" 
+            referrerpolicy="strict-origin-when-cross-origin" 
+            allowfullscreen>
+        </iframe>
+    """
 
 @ui.page('/')
 def main():
-    agent_manager = AgentManager()
-    
     # Make UI elements expand properly
     ui.query('.q-page').classes('flex')
     ui.query('.nicegui-content').classes('w-full')
@@ -19,7 +32,21 @@ def main():
     with ui.tab_panels(tabs, value=chat_tab).classes('w-full max-w-2xl mx-auto flex-grow items-stretch'):
         message_container = ui.tab_panel(chat_tab).classes('items-stretch')
         with ui.tab_panel(logs_tab):
-            log = ui.log().classes('w-full h-full')
+            log_element = ui.log().classes('w-full h-full')
+    
+    # Create callback handler with log element
+    callback_handler = NiceGuiLogElementCallbackHandler(log_element)
+    
+    # Connect the log element to both handlers
+    nicegui_handler.set_log_element(log_element)
+    callback_handler.set_log_element(log_element)
+    
+    # Initialize agent manager with callback handler
+    agent_manager = AgentManager(callback_handler=callback_handler)
+    
+    def reset_conversation():
+        message_container.clear()
+        agent_manager.reset()  
 
     async def send() -> None:
         user_message = text.value
@@ -47,17 +74,17 @@ def main():
                     if doc.metadata.get('Song'):
                         ui.label(f"Reference: {doc.metadata['Song']}").classes('text-sm font-bold')
                         if doc.metadata.get('Link'):
-                            ts = convert_timestamp_to_yt(doc.metadata.get('Timestamp', None))
-                            ui.html(f"""
-                                <iframe 
-                                    width="560" height="315" 
-                                    src="https://www.youtube.com/embed/{doc.metadata['Link'].split('=')[-1]}?si=dTVYtHXBIJeY_EH-{ts}" 
-                                    title="YouTube video player" frameborder="0" 
-                                    allow="clipboard-write; encrypted-media; picture-in-picture" 
-                                    referrerpolicy="strict-origin-when-cross-origin" 
-                                    allowfullscreen>
-                                </iframe>
-                            """)
+                            link = doc.metadata.get('Link')
+                            if isinstance(link, str) and link.startswith('['):
+                                links = eval(link)
+                                timestamps = doc.metadata.get('Timestamp', None)
+                                timestamps = eval(timestamps) if timestamps else [""]*len(links)
+                                for youtube_link, ts in zip(links, timestamps):
+                                    ts_param = convert_timestamp_to_yt(ts)
+                                    ui.html(create_youtube_embed(youtube_link, ts_param))
+                            else:
+                                ts = convert_timestamp_to_yt(doc.metadata.get('Timestamp'))
+                                ui.html(create_youtube_embed(link, ts))
         else:
             message_container.remove(ideas_response)
         
@@ -75,7 +102,18 @@ def main():
                         specialist_name = chunk['specialist'].replace('_', ' ').title()
                         ui.label(f"{specialist_name}:").classes('font-bold')
                     full_response += chunk['content']
-                    content.content = full_response
+                    
+                    # Check for YouTube reference in the fact checker's response
+                    if "Reference: https://youtube.com" in chunk['content'] or "Reference: https://www.youtube.com" in chunk['content']:
+                        # Extract the URL
+                        url = chunk['content'].split("Reference: ")[1].strip()
+                        # Display the text content
+                        content.content = full_response
+                        # Add the YouTube embed
+                        ui.html(create_youtube_embed(url))
+                    else:
+                        content.content = full_response
+                    
                     await ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
         
         message_container.remove(spinner)
@@ -87,6 +125,7 @@ def main():
             text = ui.input(placeholder='Ask me anything about music production...') \
                 .props('rounded outlined input-class=mx-3') \
                 .classes('w-full self-center').on('keydown.enter', send)
+            ui.button(icon='delete_forever', on_click=reset_conversation).props('flat').tooltip('clear conversation')
 
 ui.run(title='Music Production Assistant', host='0.0.0.0', port=8001)
         

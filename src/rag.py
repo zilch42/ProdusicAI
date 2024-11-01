@@ -20,7 +20,7 @@ def get_csv_hash():
         return hashlib.sha256(f.read()).hexdigest()
 
 @log_function
-def initialize_rag():
+async def initialize_rag():
     """
     Initialize a RAG system, using cached vector store if available and CSV hasn't changed.
     """
@@ -44,7 +44,7 @@ def initialize_rag():
     # If we reach here, we need to create a new database
     logger.info("Creating new vector store from ideas.csv")
     df = pd.read_csv("ideas.csv").replace({np.nan:None})
-    df = update_youtube_links(df)
+    df = await update_youtube_links(df)
 
     # Text to be embedded 
     # Combine relevant columns into text for embedding
@@ -77,12 +77,12 @@ def initialize_rag():
     return vectorstore
 
 
-def search_youtube_song(query: str) -> str:
+async def search_youtube_song(query: str) -> str:
     """
     Search for a song on YouTube and return its URL.
     
     Args:
-        query (str): The search query for the song
+        query (str): The search query for the song (e.g. Artist - Title)
         
     Returns:
         str: YouTube video URL, None if no video found
@@ -135,7 +135,7 @@ def convert_timestamp_to_yt(timestamp: str) -> str:
         return ""
 
 @log_function
-def update_youtube_links(df):
+async def update_youtube_links(df):
     """
     Update YouTube links in the DataFrame for entries that have songs but no links.
     
@@ -168,13 +168,13 @@ def update_youtube_links(df):
                     timestamps = [None]*len(songs)    
                 links = []
                 for song, timestamp in zip(songs, timestamps):
-                    link = search_youtube_song(song, timestamp)
+                    link = await search_youtube_song(song)
                     logger.info(f"Found YouTube link for {song}")
                     links.append(link)
                 record.Link = str(links)
                 continue
             else:
-                record.Link = search_youtube_song(record.Song, record.Timestamp)
+                record.Link = await search_youtube_song(record.Song)
             logger.info(f"Found YouTube link for {record.Song}")
 
     # Save the updated DataFrame back to CSV
@@ -194,7 +194,7 @@ async def query_rag(query, k=3):
     return results
 
 @log_function
-def get_random_by_category(category: str = None):
+async def get_random_by_category(category: str = None):
     """
     Get a random document from the RAG system matching a specific category.
     
@@ -215,9 +215,6 @@ def get_random_by_category(category: str = None):
     return record
 
 
-
-
-
 # Initialize the vector store when the module loads
 logger.info("Initializing vector store on startup")
-_vectorstore = initialize_rag()
+_vectorstore = asyncio.run(initialize_rag())

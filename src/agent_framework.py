@@ -1,5 +1,5 @@
 import os
-from typing import Annotated, Any, Dict, List, Sequence, TypedDict
+from typing import Any, Dict, List, Sequence, TypedDict
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain_openai import AzureChatOpenAI
 from langgraph.graph import Graph, START, END
@@ -7,6 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import JsonOutputParser
 from src.rag import get_random_by_category, query_rag, search_youtube_song
 from src.logger import logger
+
 
 
 SPECIALISTS = {
@@ -37,8 +38,10 @@ class AgentState(TypedDict):
     messages: Sequence[BaseMessage]
     current_agent: str
     rag_results: List[Any]
+    needs_song: bool
     suggested_song: str | None
     youtube_url: str | None
+    is_random: bool
 
 # Initialize our LLM
 llm = AzureChatOpenAI(
@@ -48,13 +51,14 @@ llm = AzureChatOpenAI(
     api_key=os.getenv("AZURE_OPENAI_API_KEY")
 )
 
-def is_random_request(state: Dict) -> bool:
+def is_random_request(state: Dict) -> Dict:
     """Check if the user is requesting a random idea."""
     last_message = state["messages"][-1].content.lower()
-    return "random idea" in last_message
+    is_random = "random idea" in last_message
+    return {**state, "is_random": is_random}
 
 
-def handle_random_request(state: Dict) -> Dict:
+async def get_random_idea_rag(state: Dict) -> Dict:
     """Handle requests for random ideas."""
     last_message = state["messages"][-1].content.lower()
     category = None
@@ -62,7 +66,7 @@ def handle_random_request(state: Dict) -> Dict:
     if "category:" in last_message:
         category = last_message.split("category:")[1].strip()
     
-    result = get_random_by_category(category)
+    result = await get_random_by_category(category)
     if result:
         return {**state, "rag_results": [result]}
     return state
@@ -85,17 +89,15 @@ def select_specialist(state: Dict) -> Dict:
     response = llm.invoke(
         specialist_selector_prompt.format_messages(messages=state["messages"])
     )
-    print("State in select_specialist:", state)  # Debug print
     
     # Return updated state with all existing fields
     return {**state, "current_agent": response.content.strip()}
 
 
-def query_vectorstore(state: Dict) -> Dict:
+async def query_vectorstore(state: Dict) -> Dict:
     """Query the vectorstore and add results to state."""
-    print("State in query_vectorstore:", state)  # Debug print
     last_message = state["messages"][-1].content
-    results = query_rag(last_message, top_k=3)
+    results = await query_rag(last_message, k=3)
     
     # Return updated state with all existing fields
     return {**state, "rag_results": results}
@@ -119,6 +121,7 @@ def filter_relevant_ideas(state: Dict) -> Dict:
     )
     try:
         relevant_indices = JsonOutputParser().parse(response.content)
+        logger.info(f"Relevant RAG indices: {relevant_indices}")
         filtered_results = [state["rag_results"][i] for i in relevant_indices]
         return {**state, "rag_results": filtered_results}
     except Exception as e:
@@ -128,17 +131,13 @@ def filter_relevant_ideas(state: Dict) -> Dict:
 
 
 def specialist_response(state: Dict) -> Dict:
-    """Generate specialist response and extract any suggested song."""
+    """Generate specialist response without song suggestions."""
     specialist_prompt = ChatPromptTemplate.from_messages([
         MessagesPlaceholder(variable_name="agent_scratchpad"),
         ("user", """Query: {query}
                     
-                    Provide expert advice to the users query. 
-                    If you are providing a list of options, do not provide any example songs and if applicable, 
-                    but if you are providing more detailed information on a specific technique, 
-                    you may suggest ONE specific song that demonstrates the technique or concept you're explaining. 
-                    If suggesting a song, format it as: SONG_EXAMPLE: Artist - Song Title
-                    """)
+                    Provide expert advice to the user's query. 
+                    Focus on explaining techniques and concepts clearly.""")
     ])
 
     response = llm.invoke(
@@ -148,77 +147,86 @@ def specialist_response(state: Dict) -> Dict:
         )
     )
     
-    # Extract song if one was suggested
-    content = response.content
-    suggested_song = None
-    if "SONG_EXAMPLE:" in content:
-        song_line = content.split("SONG_EXAMPLE:")[1].split("\n")[0].strip()
-        suggested_song = song_line
-    
     return {
         **state,
-        "messages": state["messages"] + [AIMessage(content=content)],
-        "suggested_song": suggested_song
+        "messages": state["messages"] + [AIMessage(content=response.content)]
     }
 
-
-def verify_song_example(state: Dict) -> Dict:
-    """Verify if the suggested song is a good example."""
-    fact_checker_prompt = ChatPromptTemplate.from_messages([
-        SystemMessage("""You are a music fact checker. Verify if the suggested song actually 
-                    demonstrates the technique or concept being discussed. 
-                    Return only 'true' or 'false'."""),
-        ("user", """Technique/Concept: {query}
-                    Suggested Song: {song}
-                    Verify if this song is a good example.""")
+def needs_song_suggestion(state: Dict) -> bool:
+    """Determine if a song suggestion is needed based on the specialist's response."""
+    song_check_prompt = ChatPromptTemplate.from_messages([
+        SystemMessage("""Analyze the previous response:
+                    - If it's a list of options/suggestions, respond with "NO"
+                    - If it explains a specific technique/concept that could benefit from a song example, respond with "YES"
+                    Respond ONLY with "YES" or "NO"."""), 
+        ("user", "Previous response: {previous_response}")
     ])
 
-    # TODO change this to a conditional edge     
-    if not state["suggested_song"]:
-        return state
-    
     response = llm.invoke(
-        fact_checker_prompt.format(
-            query=state["messages"][-1].content,
-            song=state["suggested_song"]
-        )
+        song_check_prompt.format(previous_response=state["messages"][-1].content)
+    )
+    return {**state, "needs_song": response.content.strip().upper() == "YES"}
+
+async def get_song_suggestion(state: Dict) -> Dict:
+    """Get song suggestion and YouTube URL when needed."""
+    song_suggester_prompt = ChatPromptTemplate.from_messages([
+        SystemMessage("""You are a music recommendation specialist. 
+                    Suggest ONE perfect song that demonstrates the concept or technique discussed in the previous response.
+                    Format your response as "SONG_SUGGESTION: Artist - Song Title"."""), 
+        ("user", "Previous response: {previous_response}")
+    ])
+
+    response = llm.invoke(
+        song_suggester_prompt.format(previous_response=state["messages"][-1].content)
     )
     
-    # TODO change this to a conditional edge or to use search_youtube_song as a tool 
-    if response.content.strip().lower() == "true":
-        youtube_url = search_youtube_song(state["suggested_song"])
-        return {**state, "youtube_url": youtube_url}
-    return {**state, "youtube_url": None, "suggested_song": None}
+    song = response.content.split("SONG_SUGGESTION:")[1].strip()
+    logger.info(f"Suggesting song: {song}")
+    youtube_url = await search_youtube_song(song)
+    
+    return {**state, "suggested_song": song, "youtube_url": youtube_url}
 
 # Graph construction
 def create_agent_graph() -> Graph:
     workflow = Graph()
     
-    # Define the conditional edges
-    workflow.add_conditional_edges(
-        START,
-        lambda x: is_random_request(x),
-        {
-            True: "handle_random",
-            False: "select_specialist"
-        }
-    )
-    
-    # Define the main flow
-    workflow.add_node("handle_random", handle_random_request)
+    # Add nodes
+    workflow.add_node("is_random_request", is_random_request)
+    workflow.add_node("get_random_idea_rag", get_random_idea_rag)
     workflow.add_node("select_specialist", select_specialist)
     workflow.add_node("query_rag", query_vectorstore)
     workflow.add_node("filter_rag", filter_relevant_ideas)
     workflow.add_node("specialist", specialist_response)
-    workflow.add_node("fact_check", verify_song_example)
+    workflow.add_node("needs_song", needs_song_suggestion)
+    workflow.add_node("get_song_and_link", get_song_suggestion)
+    
+    # Define the conditional edges
+    workflow.add_conditional_edges(
+        "is_random_request",
+        lambda state: state["is_random"],
+        {
+            True: "get_random_idea_rag",
+            False: "select_specialist"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "needs_song",
+        lambda state: state["needs_song"],
+        {
+            True: "get_song_and_link",
+            False: END
+        }
+    )
     
     # Connect the nodes
-    workflow.add_edge("handle_random", END)
+    workflow.add_edge(START, "is_random_request")
+    workflow.add_edge("get_random_idea_rag", END)
     workflow.add_edge("select_specialist", "query_rag")
     workflow.add_edge("query_rag", "filter_rag")
     workflow.add_edge("filter_rag", "specialist")
-    workflow.add_edge("specialist", "fact_check")
-    workflow.add_edge("fact_check", END)
+    workflow.add_edge("specialist", "needs_song")
+    workflow.add_edge("get_song_and_link", END)
 
     return workflow.compile()
 
@@ -231,8 +239,10 @@ async def invoke_agent(message: str) -> Dict:
         messages=[HumanMessage(content=message)],
         current_agent="",
         rag_results=[],
+        needs_song=False,
         suggested_song=None,
-        youtube_url=None
+        youtube_url=None,
+        is_random=False
     )
     
     result = await graph.ainvoke(initial_state)  # Use ainvoke instead of invoke

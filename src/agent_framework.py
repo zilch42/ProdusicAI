@@ -2,7 +2,7 @@ import os
 from typing import Annotated, Any, Dict, List, Sequence, TypedDict
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain_openai import AzureChatOpenAI
-from langgraph.graph import Graph
+from langgraph.graph import Graph, START, END
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import JsonOutputParser
 from src.rag import get_random_by_category, query_rag, search_youtube_song
@@ -42,14 +42,32 @@ class AgentState(TypedDict):
 
 # Initialize our LLM
 llm = AzureChatOpenAI(
-    openai_api_version="2023-07-01-preview",
-    azure_deployment="gpt-4",
+    openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+    azure_deployment="gpt-4o",
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY")
 )
 
+def is_random_request(state: Dict) -> bool:
+    """Check if the user is requesting a random idea."""
+    last_message = state["messages"][-1].content.lower()
+    return "random idea" in last_message
 
-def select_specialist(state: AgentState) -> Dict:
+
+def handle_random_request(state: Dict) -> Dict:
+    """Handle requests for random ideas."""
+    last_message = state["messages"][-1].content.lower()
+    category = None
+    
+    if "category:" in last_message:
+        category = last_message.split("category:")[1].strip()
+    
+    result = get_random_by_category(category)
+    if result:
+        return {**state, "rag_results": [result]}
+    return state
+
+def select_specialist(state: Dict) -> Dict:
     """Select the most appropriate specialist for the query."""
     specialist_selector_prompt = ChatPromptTemplate.from_messages([
         SystemMessage("""You are a project coordinator. Your job is to route queries to the appropriate specialist.
@@ -67,38 +85,23 @@ def select_specialist(state: AgentState) -> Dict:
     response = llm.invoke(
         specialist_selector_prompt.format_messages(messages=state["messages"])
     )
-    return {"current_agent": response.content.strip()}
-
-def is_random_request(state: AgentState) -> bool:
-    """Check if the user is requesting a random idea."""
-    last_message = state["messages"][-1].content.lower()
-    return "random idea" in last_message
-
-def handle_random_request(state: AgentState) -> Dict:
-    """Handle requests for random ideas."""
-    last_message = state["messages"][-1].content.lower()
-    category = None
+    print("State in select_specialist:", state)  # Debug print
     
-    if "category:" in last_message:
-        category = last_message.split("category:")[1].strip()
-    
-    result = get_random_by_category(category)
-    if result:
-        return {
-            "messages": state["messages"] + [AIMessage(content=str(result))]
-        }
-    return {
-        "messages": state["messages"] + [AIMessage(content="No matching ideas found.")]
-    }
+    # Return updated state with all existing fields
+    return {**state, "current_agent": response.content.strip()}
 
-def query_vectorstore(state: AgentState) -> Dict:
+
+def query_vectorstore(state: Dict) -> Dict:
     """Query the vectorstore and add results to state."""
+    print("State in query_vectorstore:", state)  # Debug print
     last_message = state["messages"][-1].content
     results = query_rag(last_message, top_k=3)
-    return {"rag_results": results}
+    
+    # Return updated state with all existing fields
+    return {**state, "rag_results": results}
 
 
-def filter_relevant_ideas(state: AgentState) -> Dict:
+def filter_relevant_ideas(state: Dict) -> Dict:
     """Filter RAG results to only those relevant to the query."""
     filter_prompt = ChatPromptTemplate.from_messages([
         SystemMessage("""You are a filter that determines which ideas are relevant to the user's query.
@@ -117,14 +120,14 @@ def filter_relevant_ideas(state: AgentState) -> Dict:
     try:
         relevant_indices = JsonOutputParser().parse(response.content)
         filtered_results = [state["rag_results"][i] for i in relevant_indices]
-        return {"rag_results": filtered_results}
+        return {**state, "rag_results": filtered_results}
     except Exception as e:
         logger.error(f"Error parsing filter response: {e}")
-        return {"rag_results": state["rag_results"]}
+        return {**state, "rag_results": state["rag_results"]}
 
 
 
-def specialist_response(state: AgentState) -> Dict:
+def specialist_response(state: Dict) -> Dict:
     """Generate specialist response and extract any suggested song."""
     specialist_prompt = ChatPromptTemplate.from_messages([
         MessagesPlaceholder(variable_name="agent_scratchpad"),
@@ -153,12 +156,13 @@ def specialist_response(state: AgentState) -> Dict:
         suggested_song = song_line
     
     return {
+        **state,
         "messages": state["messages"] + [AIMessage(content=content)],
         "suggested_song": suggested_song
     }
 
 
-def verify_song_example(state: AgentState) -> Dict:
+def verify_song_example(state: Dict) -> Dict:
     """Verify if the suggested song is a good example."""
     fact_checker_prompt = ChatPromptTemplate.from_messages([
         SystemMessage("""You are a music fact checker. Verify if the suggested song actually 
@@ -169,8 +173,9 @@ def verify_song_example(state: AgentState) -> Dict:
                     Verify if this song is a good example.""")
     ])
 
+    # TODO change this to a conditional edge     
     if not state["suggested_song"]:
-        return {"youtube_url": None}
+        return state
     
     response = llm.invoke(
         fact_checker_prompt.format(
@@ -179,10 +184,11 @@ def verify_song_example(state: AgentState) -> Dict:
         )
     )
     
+    # TODO change this to a conditional edge or to use search_youtube_song as a tool 
     if response.content.strip().lower() == "true":
         youtube_url = search_youtube_song(state["suggested_song"])
-        return {"youtube_url": youtube_url}
-    return {"youtube_url": None}
+        return {**state, "youtube_url": youtube_url}
+    return {**state, "youtube_url": None, "suggested_song": None}
 
 # Graph construction
 def create_agent_graph() -> Graph:
@@ -190,7 +196,7 @@ def create_agent_graph() -> Graph:
     
     # Define the conditional edges
     workflow.add_conditional_edges(
-        "start",
+        START,
         lambda x: is_random_request(x),
         {
             True: "handle_random",
@@ -207,17 +213,17 @@ def create_agent_graph() -> Graph:
     workflow.add_node("fact_check", verify_song_example)
     
     # Connect the nodes
+    workflow.add_edge("handle_random", END)
     workflow.add_edge("select_specialist", "query_rag")
     workflow.add_edge("query_rag", "filter_rag")
     workflow.add_edge("filter_rag", "specialist")
     workflow.add_edge("specialist", "fact_check")
-    
-    # Set end nodes
-    workflow.set_finish_nodes(["handle_random", "fact_check"])
-    
+    workflow.add_edge("fact_check", END)
+
     return workflow.compile()
 
-def invoke_agent(message: str) -> Dict:
+# Update the invoke_agent function to be async
+async def invoke_agent(message: str) -> Dict:
     """Main entry point for the agent framework."""
     graph = create_agent_graph()
     
@@ -229,5 +235,5 @@ def invoke_agent(message: str) -> Dict:
         youtube_url=None
     )
     
-    result = graph.invoke(initial_state)
+    result = await graph.ainvoke(initial_state)  # Use ainvoke instead of invoke
     return result

@@ -1,7 +1,10 @@
 from nicegui import ui
+from langchain.schema import AIMessage
+
 from src.agents import AgentManager
 from src.rag import convert_timestamp_to_yt, query_rag
 from src.logger import NiceGuiLogElementCallbackHandler, nicegui_handler
+from src.agent_framework import invoke_agent
 
 def create_youtube_embed(url: str, timestamp: str = "") -> str:
     """Create an HTML iframe for a YouTube URL."""
@@ -62,15 +65,15 @@ def main():
             ideas_response = ui.chat_message(name='Relevant Ideas', sent=False)
             specialist_message = ui.chat_message(name='Assistant', sent=False)
             spinner = ui.spinner(type='audio', size='3em')
-            
-        # First get RAG results
-        rag_results = await query_rag(user_message)
+        
+        # Get response from agent framework
+        result = await invoke_agent(user_message)
         
         # Show RAG results if any
-        if len(rag_results) > 0:
+        if result["rag_results"]:
             with ideas_response:
                 ui.label('Relevant Ideas:')
-                for doc in rag_results:
+                for doc in result["rag_results"]:
                     ui.markdown(f"- {doc.page_content}")
                     if doc.metadata.get('Song'):
                         ui.label(f"Reference: {doc.metadata['Song']}").classes('text-sm font-bold')
@@ -90,33 +93,22 @@ def main():
         else:
             message_container.remove(ideas_response)
         
-        # Get specialist response
+        # Show specialist response
         specialist_message.clear()
         with specialist_message:
-            specialist_name = None
-            content = ui.markdown()  # Create empty markdown element
+            specialist_name = result["current_agent"].replace('_', ' ').title()
+            ui.label(f"{specialist_name}:").classes('font-bold')
             
-            # Stream the response
-            full_response = ""
-            async for chunk in agent_manager.get_specialist_response(user_message, rag_results):
-                if chunk['content']:
-                    if not specialist_name:
-                        specialist_name = chunk['specialist'].replace('_', ' ').title()
-                        ui.label(f"{specialist_name}:").classes('font-bold')
-                    full_response += chunk['content']
+            # Get the last AI message from the messages list
+            ai_message = next((msg for msg in reversed(result["messages"]) if isinstance(msg, AIMessage)), None)
+            if ai_message:
+                ui.markdown(ai_message.content)
+                
+                # If there's a verified YouTube example, show it
+                if result.get("youtube_url"):
+                    ui.html(create_youtube_embed(result["youtube_url"]))
                     
-                    # Check for YouTube reference in the fact checker's response
-                    if "Reference: https://youtube.com" in chunk['content'] or "Reference: https://www.youtube.com" in chunk['content']:
-                        # Extract the URL
-                        url = chunk['content'].split("Reference: ")[1].strip()
-                        # Display the text content
-                        content.content = full_response
-                        # Add the YouTube embed
-                        ui.html(create_youtube_embed(url))
-                    else:
-                        content.content = full_response
-                    
-                    await ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
+            await ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
         
         message_container.remove(spinner)
         await ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')

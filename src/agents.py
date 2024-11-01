@@ -85,8 +85,8 @@ class AgentManager:
         self.current_specialist = None
         self.message_chain = []
         self.llm = AzureChatOpenAI(
-            openai_api_version="2023-07-01-preview",
-            azure_deployment="gpt-4",
+            openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+            azure_deployment="gpt-4o",
             azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
             api_key=os.getenv("AZURE_OPENAI_API_KEY"),
             callbacks=[callback_handler] if callback_handler else []

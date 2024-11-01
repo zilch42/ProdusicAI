@@ -1,10 +1,13 @@
-from nicegui import ui
+from importlib import metadata
+from nicegui import ui, app
 from langchain.schema import AIMessage
 
 from src.agents import AgentManager
 from src.rag import convert_timestamp_to_yt, query_rag
 from src.logger import NiceGuiLogElementCallbackHandler, nicegui_handler
 from src.agent_framework import invoke_agent
+
+app.add_static_files('/img', 'img')
 
 def create_youtube_embed(url: str, timestamp: str = "") -> str:
     """Create an HTML iframe for a YouTube URL."""
@@ -61,9 +64,12 @@ def main():
         
         # Add user message
         with message_container:
-            ui.chat_message(text=user_message, name='You', sent=True)
-            ideas_response = ui.chat_message(name='Relevant Ideas', sent=False)
-            specialist_message = ui.chat_message(name='Assistant', sent=False)
+            ui.chat_message(text=user_message, name='You', sent=True, avatar='img/sprite.png').classes('q-pa-md')\
+                .props('text-color="black" bg-color="orange-3"')
+            ideas_response = ui.chat_message(name='Relevant Ideas', sent=False).classes('q-pa-md')\
+                .props('text-color="black" bg-color="brown-3"')
+            specialist_message = ui.chat_message(name='Assistant', sent=False, avatar='img/logo2.png').classes('q-pa-md')\
+                .props('text-color="black" bg-color="primary"')
             spinner = ui.spinner(type='audio', size='3em')
         
         # Get response from agent framework
@@ -72,24 +78,24 @@ def main():
         # Show RAG results if any
         if result["rag_results"]:
             with ideas_response:
-                ui.label('Relevant Ideas:')
                 for doc in result["rag_results"]:
-                    ui.markdown(f"- {doc.page_content}")
+                    idea_text = f"## {doc.metadata['Technique']}\n{doc.metadata['Description']}"
                     if doc.metadata.get('Song'):
-                        ui.label(f"Reference: {doc.metadata['Song']}").classes('text-sm font-bold')
-                        if doc.metadata.get('Link'):
-                            link = doc.metadata.get('Link')
-                            if isinstance(link, str) and link.startswith('['):
-                                links = eval(link)
-                                timestamps = doc.metadata.get('Timestamp', None)
-                                timestamps = eval(timestamps) if timestamps else [""]*len(links)
-                                for youtube_link, ts in zip(links, timestamps):
-                                    ts_param = convert_timestamp_to_yt(ts)
-                                    ui.html(create_youtube_embed(youtube_link, ts_param))
-                            else:
-                                ts = convert_timestamp_to_yt(doc.metadata.get('Timestamp'))
-                                ui.html(create_youtube_embed(link, ts))
-                            await ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
+                        idea_text += f"\n\n*Reference: {doc.metadata['Song']}*"
+                    ui.markdown(idea_text)
+                    if doc.metadata.get('Link'):
+                        link = doc.metadata.get('Link')
+                        if isinstance(link, str) and link.startswith('['):
+                            links = eval(link)
+                            timestamps = doc.metadata.get('Timestamp', None)
+                            timestamps = eval(timestamps) if timestamps else [""]*len(links)
+                            for youtube_link, ts in zip(links, timestamps):
+                                ts_param = convert_timestamp_to_yt(ts)
+                                ui.html(create_youtube_embed(youtube_link, ts_param))
+                        else:
+                            ts = convert_timestamp_to_yt(doc.metadata.get('Timestamp'))
+                            ui.html(create_youtube_embed(link, ts))
+                        await ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
         else:
             message_container.remove(ideas_response)
         

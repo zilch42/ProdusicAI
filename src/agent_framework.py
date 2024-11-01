@@ -165,7 +165,8 @@ def needs_song_suggestion(state: Dict) -> bool:
     response = llm.invoke(
         song_check_prompt.format(previous_response=state["messages"][-1].content)
     )
-    return {**state, "needs_song": response.content.strip().upper() == "YES"}
+    logger.info(f"Needs song suggestion: {response.content.strip().upper()}")
+    return {**state, "needs_song": "YES" in response.content.strip().upper()}
 
 async def get_song_suggestion(state: Dict) -> Dict:
     """Get song suggestion and YouTube URL when needed."""

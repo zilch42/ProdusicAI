@@ -16,3 +16,7 @@ logos/
 app.log
 chroma_db/
 ideas_csv.hash
+todo.md
+test.ipynb
+output.jpg
+.vscode/

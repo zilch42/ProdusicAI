@@ -1,4 +1,4 @@
-# ![ProdusicAI Logo](img/logo2.png) ProdusicAI - Music Production AI Assistant
+# <img src="img/logo2.png" alt="ProdusicAI Logo" width="50"> ProdusicAI - Music Production AI Assistant
 
 An intelligent chat interface for music production assistance, powered by Azure OpenAI and LangChain. The application uses a combination of RAG (Retrieval Augmented Generation) and specialized AI agents to provide contextual advice about music production techniques.
 

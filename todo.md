@@ -1,4 +1,0 @@
-- async streaming 
-- logging
-- testing
-- conversation history

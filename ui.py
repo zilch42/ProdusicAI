@@ -189,10 +189,14 @@ def main():
 
         with suggested_prompts_container:
             if which in ["rag", "all"]:
-                ui.label("Get random ideas from database:").classes('q-ma-md').style('font-size: 200%; font-weight: 300')
+                with ui.row():
+                    ui.icon('casino').classes('self-center text-5xl')
+                    ui.label("Get random ideas from database:").classes('q-ma-md').style('font-size: 200%; font-weight: 300')
                 display_prompt_cards(_rag_categories, "Give me a random idea for")
             if which in ["prompt", "all"]:
-                ui.label("Quick start chat prompts:").classes('q-ma-md').style('font-size: 200%; font-weight: 300')
+                with ui.row():
+                    ui.icon('live_help').classes('self-center text-5xl')
+                    ui.label("Quick start chat prompts:").classes('q-ma-md').style('font-size: 200%; font-weight: 300')
                 display_prompt_cards(prompts)
 
     async def enter_prompt(prompt: str):

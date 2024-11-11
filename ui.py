@@ -2,8 +2,7 @@ from importlib import metadata
 from nicegui import ui, app
 from langchain.schema import AIMessage
 
-from src.agents import AgentManager
-from src.rag import convert_timestamp_to_yt, query_rag
+from src.rag import convert_timestamp_to_yt, query_rag, _rag_categories
 from src.logger import NiceGuiLogElementCallbackHandler, nicegui_handler
 from src.agent_framework import invoke_agent
 
@@ -25,6 +24,14 @@ def create_youtube_embed(url: str, timestamp: str = "") -> str:
 
 @ui.page('/')
 def main():
+    """Main application page that sets up the chat interface.
+    
+    Creates a tabbed interface with two panels:
+    - Chat: Main interaction area with the AI assistant
+    - Logs: Debug logging information
+    
+    The chat interface includes suggested prompts and a message input area.
+    """
     # Make UI elements expand properly
     ui.query('.q-page').classes('flex')
     ui.query('.nicegui-content').classes('w-full')
@@ -48,14 +55,20 @@ def main():
     nicegui_handler.set_log_element(log_element)
     callback_handler.set_log_element(log_element)
     
-    # Initialize agent manager with callback handler
-    agent_manager = AgentManager(callback_handler=callback_handler)
-    
     def reset_conversation():
+        """Clear the chat history and restore suggested prompts."""
         message_container.clear()
-        agent_manager.reset()  
+        show_suggested_prompts()  # Show suggested prompts when conversation is reset
 
     async def send() -> None:
+        """Process and send user message to the AI assistant.
+        
+        Handles:
+        - Displaying user message
+        - Retrieving and showing relevant RAG results
+        - Getting and displaying AI assistant response
+        - Managing UI elements (spinners, scroll behavior)
+        """
         user_message = text.value
         if not user_message:
             return
@@ -64,13 +77,26 @@ def main():
         
         # Add user message
         with message_container:
-            ui.chat_message(text=user_message, name='You', sent=True, avatar='img/sprite.png').classes('q-pa-md')\
-                .props('text-color="black" bg-color="orange-3"')
-            ideas_response = ui.chat_message(name='Relevant Ideas', sent=False).classes('q-pa-md')\
-                .props('text-color="black" bg-color="brown-3"')
-            specialist_message = ui.chat_message(name='Assistant', sent=False, avatar='img/logo2.png').classes('q-pa-md')\
-                .props('text-color="black" bg-color="primary"')
+            ui.chat_message(text=user_message, 
+                            name='You', 
+                            sent=True, 
+                            avatar='img/sprite.png')\
+                            .classes('q-pa-md')\
+                            .props('text-color="black" bg-color="orange-3"')
+            ideas_response = ui.chat_message(name='Relevant Ideas', 
+                                             sent=False,
+                                             avatar='img/db_icon.png')\
+                            .classes('q-pa-md')\
+                            .props('text-color="black" bg-color="brown-3"')
+            specialist_message = ui.chat_message(name='Selecting Assistant...', 
+                                                 sent=False, 
+                                                 avatar='img/logo2.png')\
+                            .classes('q-pa-md')\
+                            .props('text-color="black" bg-color="blue-3"')
             spinner = ui.spinner(type='audio', size='3em')
+        
+        # Hide suggested prompts when a message is sent
+        suggested_prompts_container.clear()
         
         # Get response from agent framework
         result = await invoke_agent(user_message)
@@ -99,11 +125,10 @@ def main():
         else:
             message_container.remove(ideas_response)
         
-        # Show specialist response
-        specialist_message.clear()
-        with specialist_message:
+        # Show specialist response 
+        with specialist_message as sm:
             specialist_name = result["current_agent"].replace('_', ' ').title()
-            ui.label(f"{specialist_name}:").classes('font-bold')
+            sm.props(f'name="{specialist_name}"')
             
             # Get the last AI message from the messages list
             ai_message = next((msg for msg in reversed(result["messages"]) if isinstance(msg, AIMessage)), None)
@@ -118,6 +143,55 @@ def main():
         
         message_container.remove(spinner)
         await ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
+
+    # Suggested prompts container
+    suggested_prompts_container = ui.column().classes('w-full max-w-2xl mx-auto my-6 items-center')
+
+    def show_suggested_prompts():
+        """Display two sections of clickable prompt suggestions:
+        - Random ideas from the RAG database
+        - Quick start chat prompts for common questions
+        """
+        prompts = [
+            "How do I mix vocals?",
+            "What effects can I put on cymbals?",
+            "How can I improve my bassline?",
+            "What is sidechain compression?",
+            "How do I master a track?", 
+            "What chord progressions sound like Radiohead?"
+        ]
+        
+        def display_prompt_cards(text_list, prefix: str = ""):
+            """Display a list of clickable prompt cards.
+            
+            Args:
+                text_list (list[str]): List of prompt texts
+                prefix (str): Prefix to prepend to each prompt text
+            """
+            # rows of 2
+            for i in range(0, len(text_list), 2):
+                with ui.row().classes('w-full justify-center'):
+                    for text in text_list[i:i+2]:
+                        with ui.card().classes('q-pa-md').style('width: 40%') \
+                            .on('click', lambda p=text: enter_prompt(f'{prefix} {p}')) \
+                            .props('hoverable') \
+                            .classes('cursor-pointer hover:bg-blue-100'):
+                            ui.label(text).classes('text-center')
+
+        with suggested_prompts_container:
+            ui.label("Get random ideas from database:").classes('q-ma-md').style('font-size: 200%; font-weight: 300')
+            display_prompt_cards(_rag_categories, "Give me a random idea for")
+            ui.label("Quick start chat prompts:").classes('q-ma-md').style('font-size: 200%; font-weight: 300')
+            display_prompt_cards(prompts)
+
+    async def enter_prompt(prompt: str):
+        """Handle when a suggested prompt is clicked."""
+        text.value = prompt
+        suggested_prompts_container.clear()
+        await send()
+
+    # Show suggested prompts initially
+    show_suggested_prompts()
 
     # Footer with input
     with ui.footer().classes('bg-white'), ui.column().classes('w-full max-w-3xl mx-auto my-6'):

@@ -15,14 +15,26 @@ load_dotenv()
 
 @log_function
 def get_csv_hash():
-    """Calculate SHA-256 hash of ideas.csv"""
+    """
+    Calculate SHA-256 hash of ideas.csv file.
+    """
     with open("ideas.csv", "rb") as f:
         return hashlib.sha256(f.read()).hexdigest()
 
 @log_function
 async def initialize_rag():
     """
-    Initialize a RAG system, using cached vector store if available and CSV hasn't changed.
+    Initialize a RAG (Retrieval-Augmented Generation) system.
+
+    This function either loads a cached vector store if available and the source CSV hasn't changed,
+    or creates a new vector store from the ideas.csv file.
+
+    Returns:
+        Chroma: Initialized vector store instance
+
+    Side Effects:
+        - Creates/updates chroma_db directory
+        - Creates/updates ideas_csv.hash file
     """
     csv_hash = get_csv_hash()
     persist_directory = "chroma_db"
@@ -139,8 +151,8 @@ async def update_youtube_links(df):
     """
     Update YouTube links in the DataFrame for entries that have songs but no links.
     
-    The function handles both single songs and lists of songs. For lists, it matches
-    songs with their corresponding timestamps if available.
+    The function handles both single songs and lists of songs, matching songs with 
+    their corresponding timestamps if available.
     
     Args:
         df (pandas.DataFrame): DataFrame containing song information with columns:
@@ -151,9 +163,8 @@ async def update_youtube_links(df):
     Returns:
         pandas.DataFrame: Updated DataFrame with new YouTube links
         
-    Side effects:
-        - Saves the updated DataFrame back to 'ideas.csv'
-        - Logs the progress of finding YouTube links
+    Side Effects:
+        - Updates ideas.csv with new YouTube links
     """
 
     for record in df.itertuples():
@@ -188,6 +199,13 @@ async def update_youtube_links(df):
 async def query_rag(query, k=3):
     """
     Query the RAG system to find similar documents based on semantic search.
+
+    Args:
+        query (str): The search query text
+        k (int, optional): Number of results to return. Defaults to 3.
+
+    Returns:
+        list[Document]: List of matching documents ordered by relevance
     """
     global _vectorstore
     results = await _vectorstore.asimilarity_search(query, k=k)
@@ -199,22 +217,41 @@ async def get_random_by_category(category: str = None):
     Get a random document from the RAG system matching a specific category.
     
     Args:
-        category (str): The category to filter by
+        category (str | list[str] | None): Category or list of categories to filter by.
+            If None, selects from all categories.
         
     Returns:
-        Document: A random document from the specified category, or None if no matches
+        Document | None: A random document from the specified category/categories,
+            or None if no matches found
     """
-    where = {"Category": category} if category else None
+    # For filtering by single category or list of categories
+    where = {"Category": {"$in": [category]} if isinstance(category, str) else {"$in": category}} if category else None
+
     global _vectorstore
     ids = _vectorstore.get(where=where, include=['documents']).get('ids', [])
     if not ids:
         logger.warning(f"No documents found for category: {category}")
         return None
+    
     random_id = random.choice(ids)
+
     record = _vectorstore.get(ids=random_id)
-    return record
+    return Document(page_content=record['documents'][0], metadata=record['metadatas'][0])
+
+async def get_category_list():
+    """
+    Get a unique list of all categories from the vector store metadata.
+
+    Returns:
+        list[str]: Sorted list of unique categories
+    """
+    global _vectorstore
+    results = _vectorstore.get(include=['metadatas'])
+    categories = {doc.get('Category') for doc in results['metadatas'] if doc.get('Category')}
+    return sorted(list(categories))
 
 
 # Initialize the vector store when the module loads
 logger.info("Initializing vector store on startup")
 _vectorstore = asyncio.run(initialize_rag())
+_rag_categories = asyncio.run(get_category_list())

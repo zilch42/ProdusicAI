@@ -5,7 +5,7 @@ from langchain_openai import AzureChatOpenAI
 from langgraph.graph import Graph, START, END
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import JsonOutputParser
-from src.rag import get_random_by_category, query_rag, search_youtube_song
+from src.rag import get_random_by_category, query_rag, search_youtube_song, _rag_categories
 from src.logger import logger
 
 
@@ -35,6 +35,17 @@ SPECIALISTS = {
 
 # Type definitions for our state
 class AgentState(TypedDict):
+    """State container for the agent workflow.
+    
+    Attributes:
+        messages: Sequence of conversation messages
+        current_agent: Currently selected specialist agent
+        rag_results: Retrieved context from vector store
+        needs_song: Flag indicating if a song example is needed
+        suggested_song: Recommended song for reference
+        youtube_url: YouTube URL for the suggested song
+        is_random: Flag indicating if user requested a random idea
+    """
     messages: Sequence[BaseMessage]
     current_agent: str
     rag_results: List[Any]
@@ -63,8 +74,9 @@ async def get_random_idea_rag(state: Dict) -> Dict:
     last_message = state["messages"][-1].content.lower()
     category = None
     
-    if "category:" in last_message:
-        category = last_message.split("category:")[1].strip()
+    categories_in_message = [category for category in _rag_categories if category.lower() in last_message]
+    if categories_in_message:
+        category = categories_in_message
     
     result = await get_random_by_category(category)
     if result:
@@ -104,7 +116,14 @@ async def query_vectorstore(state: Dict) -> Dict:
 
 
 def filter_relevant_ideas(state: Dict) -> Dict:
-    """Filter RAG results to only those relevant to the query."""
+    """Filter RAG results to only those relevant to the user's query.
+    
+    Args:
+        state: Current agent state containing messages and RAG results
+        
+    Returns:
+        Updated state with filtered RAG results
+    """
     filter_prompt = ChatPromptTemplate.from_messages([
         SystemMessage("""You are a filter that determines which ideas are relevant to the user's query.
                     Analyze each idea and return a JSON list of indices for relevant ideas only.
@@ -131,7 +150,14 @@ def filter_relevant_ideas(state: Dict) -> Dict:
 
 
 def specialist_response(state: Dict) -> Dict:
-    """Generate specialist response without song suggestions."""
+    """Generate a response from the selected specialist agent.
+    
+    Args:
+        state: Current agent state containing messages and specialist selection
+        
+    Returns:
+        Updated state with specialist's response added to messages
+    """
     specialist_prompt = ChatPromptTemplate.from_messages([
         MessagesPlaceholder(variable_name="agent_scratchpad"),
         ("user", """Query: {query}
@@ -155,24 +181,32 @@ def specialist_response(state: Dict) -> Dict:
 def needs_song_suggestion(state: Dict) -> bool:
     """Determine if a song suggestion is needed based on the specialist's response."""
     song_check_prompt = ChatPromptTemplate.from_messages([
-        SystemMessage("""Analyze the previous response:
-                    - If it's a list of options/suggestions, respond with "NO"
-                    - If it explains a specific technique/concept that could benefit from a song example, respond with "YES"
+        SystemMessage("""Analyze the previous response to determine whether it contains a detailed description of a single technique or a list of techniques offer this suggestions. A list of techniques may be formatted as a numbered markdown list and include more than 2 items:
+                    - If it is a detailed description of a single technique, respond with "YES"
+                    - If it is a list of suggested techniques, respond with "NO"
                     Respond ONLY with "YES" or "NO"."""), 
-        ("user", "Previous response: {previous_response}")
+        AIMessage("Previous response: {previous_response}")
     ])
 
     response = llm.invoke(
-        song_check_prompt.format(previous_response=state["messages"][-1].content)
+        song_check_prompt.format(previous_response=state["messages"][-1].content),
+        temperature=0.3
     )
-    logger.info(f"Needs song suggestion: {response.content.strip().upper()}")
-    return {**state, "needs_song": "YES" in response.content.strip().upper()}
+    logger.info(f"Needs song suggestion: {response.content.strip()}")
+    
+    try:
+        needs_song = "YES" in response.content.strip().upper()
+    except Exception as e:
+        logger.error(f"Error parsing song suggestion response: {e}")
+        needs_song = False
+    
+    return {**state, "needs_song": needs_song}
 
 async def get_song_suggestion(state: Dict) -> Dict:
     """Get song suggestion and YouTube URL when needed."""
     song_suggester_prompt = ChatPromptTemplate.from_messages([
-        SystemMessage("""You are a music recommendation specialist. 
-                    Suggest ONE perfect song that demonstrates the concept or technique discussed in the previous response.
+        SystemMessage("""You are an experienced music producer. 
+                    Suggest ONE reference song that demonstrates the concept or technique discussed in the previous response.
                     Format your response as "SONG_SUGGESTION: Artist - Song Title"."""), 
         ("user", "Previous response: {previous_response}")
     ])
@@ -189,6 +223,19 @@ async def get_song_suggestion(state: Dict) -> Dict:
 
 # Graph construction
 def create_agent_graph() -> Graph:
+    """Create the workflow graph for the agent framework.
+    
+    The graph defines the following workflow:
+    1. Check if user requested random idea
+    2. Either get random idea or select specialist
+    3. Query vector store for relevant context
+    4. Filter results for relevance
+    5. Generate specialist response
+    6. Optionally suggest reference song
+    
+    Returns:
+        Compiled workflow graph
+    """
     workflow = Graph()
     
     # Add nodes
@@ -233,7 +280,14 @@ def create_agent_graph() -> Graph:
 
 # Update the invoke_agent function to be async
 async def invoke_agent(message: str) -> Dict:
-    """Main entry point for the agent framework."""
+    """Main entry point for the agent framework.
+    
+    Args:
+        message: User input message
+        
+    Returns:
+        Final state containing agent response, and optionally a song suggestion
+    """
     graph = create_agent_graph()
     
     initial_state = AgentState(

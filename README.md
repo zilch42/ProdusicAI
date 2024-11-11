@@ -1,6 +1,10 @@
-# Music Production AI Assistant
+# ![ProdusicAI Logo](img/logo2.png) ProdusicAI - Music Production AI Assistant
 
 An intelligent chat interface for music production assistance, powered by Azure OpenAI and LangChain. The application uses a combination of RAG (Retrieval Augmented Generation) and specialized AI agents to provide contextual advice about music production techniques.
+
+The RAG system draws from a CSV file containing music production techniques that I have collected over the years from listening to other songs. Where possible they contain a reference song. The Youtube API is used to fetch a video for the suggested song.
+
+The app can either pull a random idea from a given category from the RAG system, or it can be used interactively to ask questions. General questions will also pull any relevant ideas from the RAG system.
 
 ## Features
 

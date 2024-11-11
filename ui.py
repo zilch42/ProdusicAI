@@ -1,9 +1,7 @@
-from importlib import metadata
 from nicegui import ui, app
 from langchain.schema import AIMessage
-
-from src.rag import convert_timestamp_to_yt, query_rag, _rag_categories
-from src.logger import NiceGuiLogElementCallbackHandler, nicegui_handler
+from src.rag import convert_timestamp_to_yt, _rag_categories
+from src.logger import logger, log_function, log_rag_query, nicegui_handler
 from src.agent_framework import invoke_agent
 
 app.add_static_files('/img', 'img')
@@ -47,18 +45,17 @@ def main():
         with ui.tab_panel(logs_tab):
             log_element = ui.log().classes('w-full h-full')
     
-    # Create callback handler with log element
-    callback_handler = NiceGuiLogElementCallbackHandler(log_element)
-    # llm.callbacks = [callback_handler]
-    
     # Connect the log element to both handlers
     nicegui_handler.set_log_element(log_element)
-    callback_handler.set_log_element(log_element)
+    
+    # Initialize previous_messages list at the start of main()
+    previous_messages = []
     
     def reset_conversation():
         """Clear the chat history and restore suggested prompts."""
         message_container.clear()
-        show_suggested_prompts()  # Show suggested prompts when conversation is reset
+        previous_messages.clear()
+        show_suggested_prompts()
 
     async def send() -> None:
         """Process and send user message to the AI assistant.
@@ -69,13 +66,14 @@ def main():
         - Getting and displaying AI assistant response
         - Managing UI elements (spinners, scroll behavior)
         """
+        nonlocal previous_messages 
         user_message = text.value
         if not user_message:
             return
         
         text.value = ''
         
-        # Add user message
+        # Add user message to UI
         with message_container:
             ui.chat_message(text=user_message, 
                             name='You', 
@@ -94,18 +92,25 @@ def main():
                             .classes('q-pa-md')\
                             .props('text-color="black" bg-color="blue-3"')
             spinner = ui.spinner(type='audio', size='3em')
+
+        await ui.run_javascript("window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })")
         
-        # Hide suggested prompts when a message is sent
         suggested_prompts_container.clear()
-        
-        # Get response from agent framework
-        result = await invoke_agent(user_message)
-        
-        # Show RAG results if any
+
+        # Create and store the new human message
+        result = await invoke_agent(user_message, previous_messages=previous_messages)
+        previous_messages = result["previous_messages"]
+
+        # Show RAG results only if not a followup question
         if result["rag_results"]:
             with ideas_response:
                 for doc in result["rag_results"]:
-                    idea_text = f"## {doc.metadata['Technique']}\n{doc.metadata['Description']}"
+                    try:
+                        idea_text = f"## {doc.metadata['Technique']}\n{doc.metadata['Description']}"
+                    except KeyError as e:
+                        logger.error(f"Error in RAG doc: {doc.metadata}")
+                        logger.error(e)
+                        idea_text = "Error with RAG doc metadata"
                     if doc.metadata.get('Song'):
                         idea_text += f"\n\n*Reference: {doc.metadata['Song']}*"
                     ui.markdown(idea_text)
@@ -121,33 +126,37 @@ def main():
                         else:
                             ts = convert_timestamp_to_yt(doc.metadata.get('Timestamp'))
                             ui.html(create_youtube_embed(link, ts))
-                        await ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
+                        await ui.run_javascript("window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })")
         else:
             message_container.remove(ideas_response)
         
-        # Show specialist response 
-        with specialist_message as sm:
-            specialist_name = result["current_agent"].replace('_', ' ').title()
-            sm.props(f'name="{specialist_name}"')
-            
-            # Get the last AI message from the messages list
+        if result.get("is_random", False):
+            show_suggested_prompts("rag")
+            message_container.remove(specialist_message)
+        else:
+            # Show specialist response
             ai_message = next((msg for msg in reversed(result["messages"]) if isinstance(msg, AIMessage)), None)
             if ai_message:
-                ui.markdown(ai_message.content)
+                with specialist_message as sm:
+                    specialist_name = result["current_agent"].replace('_', ' ').title()
+                    sm.props(f'name="{specialist_name}"')
+                    ui.markdown(ai_message.content)
                 
                 # If there's a verified YouTube example, show it
                 if result.get("youtube_url"):
                     ui.html(create_youtube_embed(result["youtube_url"]))
                     
-            await ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
+                await ui.run_javascript("window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })")
+            else:
+                message_container.remove(specialist_message)
         
         message_container.remove(spinner)
-        await ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
+        await ui.run_javascript("window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })")
 
     # Suggested prompts container
     suggested_prompts_container = ui.column().classes('w-full max-w-2xl mx-auto my-6 items-center')
 
-    def show_suggested_prompts():
+    def show_suggested_prompts(which: str = "all"):
         """Display two sections of clickable prompt suggestions:
         - Random ideas from the RAG database
         - Quick start chat prompts for common questions
@@ -179,10 +188,12 @@ def main():
                             ui.label(text).classes('text-center')
 
         with suggested_prompts_container:
-            ui.label("Get random ideas from database:").classes('q-ma-md').style('font-size: 200%; font-weight: 300')
-            display_prompt_cards(_rag_categories, "Give me a random idea for")
-            ui.label("Quick start chat prompts:").classes('q-ma-md').style('font-size: 200%; font-weight: 300')
-            display_prompt_cards(prompts)
+            if which in ["rag", "all"]:
+                ui.label("Get random ideas from database:").classes('q-ma-md').style('font-size: 200%; font-weight: 300')
+                display_prompt_cards(_rag_categories, "Give me a random idea for")
+            if which in ["prompt", "all"]:
+                ui.label("Quick start chat prompts:").classes('q-ma-md').style('font-size: 200%; font-weight: 300')
+                display_prompt_cards(prompts)
 
     async def enter_prompt(prompt: str):
         """Handle when a suggested prompt is clicked."""

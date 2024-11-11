@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import hashlib
 import asyncio
-
+import shutil
 load_dotenv()
 
 @log_function
@@ -55,6 +55,8 @@ async def initialize_rag():
 
     # If we reach here, we need to create a new database
     logger.info("Creating new vector store from ideas.csv")
+    if os.path.exists(persist_directory):
+        shutil.rmtree(persist_directory)
     df = pd.read_csv("ideas.csv").replace({np.nan:None})
     df = await update_youtube_links(df)
 
@@ -79,7 +81,6 @@ async def initialize_rag():
         embedding_model, 
         persist_directory=persist_directory
     )
-    vectorstore.persist()
     
     # Save the hash
     with open(hash_file, "w") as f:

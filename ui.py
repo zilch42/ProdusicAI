@@ -9,16 +9,18 @@ app.add_static_files('/img', 'img')
 def create_youtube_embed(url: str, timestamp: str = "") -> str:
     """Create an HTML iframe for a YouTube URL."""
     video_id = url.split('=')[-1]
-    return f"""
-        <iframe 
-            width="560" height="315" 
-            src="https://www.youtube.com/embed/{video_id}?si=dTVYtHXBIJeY_EH-{timestamp}" 
-            title="YouTube video player" frameborder="0" 
-            allow="clipboard-write; encrypted-media; picture-in-picture" 
-            referrerpolicy="strict-origin-when-cross-origin" 
-            allowfullscreen>
-        </iframe>
+    html = f"""
+<iframe 
+    width="560" height="315" 
+    src="https://www.youtube.com/embed/{video_id}?si=dTVYtHXBIJeY_EH-{timestamp}" 
+    title="YouTube video player" frameborder="0" 
+    allow="clipboard-write; encrypted-media; picture-in-picture" 
+    referrerpolicy="no-referrer-when-downgrade" 
+    allowfullscreen>
+</iframe>
     """
+    print(html)
+    return html
 
 @ui.page('/')
 def main():
@@ -55,6 +57,7 @@ def main():
         """Clear the chat history and restore suggested prompts."""
         message_container.clear()
         previous_messages.clear()
+        suggested_prompts_container.clear()
         show_suggested_prompts()
 
     async def send() -> None:
@@ -81,12 +84,12 @@ def main():
                             avatar='img/sprite.png')\
                             .classes('q-pa-md')\
                             .props('text-color="black" bg-color="orange-3"')
-            ideas_response = ui.chat_message(name='Relevant Ideas', 
+            ideas_response = ui.chat_message(name='Fetching relevant ideas...', 
                                              sent=False,
                                              avatar='img/db_icon.png')\
                             .classes('q-pa-md')\
                             .props('text-color="black" bg-color="brown-3"')
-            specialist_message = ui.chat_message(name='Selecting Assistant...', 
+            specialist_message = ui.chat_message(name='Selecting assistant...', 
                                                  sent=False, 
                                                  avatar='img/logo2.png')\
                             .classes('q-pa-md')\
@@ -103,7 +106,8 @@ def main():
 
         # Show RAG results only if not a followup question
         if result["rag_results"]:
-            with ideas_response:
+            with ideas_response as ir:
+                ir.props(f'name="Relevant ideas"')
                 for doc in result["rag_results"]:
                     try:
                         idea_text = f"## {doc.metadata['Technique']}\n{doc.metadata['Description']}"
@@ -144,6 +148,7 @@ def main():
                 
                 # If there's a verified YouTube example, show it
                 if result.get("youtube_url"):
+                    logger.info(f"Showing YouTube example: {result['youtube_url']}")
                     ui.html(create_youtube_embed(result["youtube_url"]))
                     
                 await ui.run_javascript("window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })")

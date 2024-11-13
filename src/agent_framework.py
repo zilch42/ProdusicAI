@@ -190,9 +190,7 @@ def specialist_response(state: Dict) -> Dict:
 def needs_song_suggestion(state: Dict) -> bool:
     """Determine if a song suggestion is needed based on the specialist's response."""
     song_check_prompt = ChatPromptTemplate.from_messages([
-        SystemMessage("""Analyze the previous response to determine whether it contains a detailed description of a single technique or a list of techniques offer this suggestions. A list of techniques may be formatted as a numbered markdown list and include more than 2 items:
-                    - If it is a detailed description of a single technique, respond with "YES"
-                    - If it is a list of suggested techniques, respond with "NO"
+        SystemMessage("""Analyze the conversation and determine whether it would be useful to provide a song suggestion to demonstrate the concept or technique discussed in the previous response.
                     Respond ONLY with "YES" or "NO"."""), 
         AIMessage("Previous response: {specialist_response}")
     ])
@@ -209,7 +207,8 @@ def needs_song_suggestion(state: Dict) -> bool:
         logger.error(f"Error parsing song suggestion response: {e}")
         needs_song = False
     
-    return {**state, "needs_song": needs_song}
+    # TODO: This is a hack to get the song suggestion to run every time
+    return {**state, "needs_song": True}
 
 async def get_song_suggestion(state: Dict) -> Dict:
     """Get song suggestion and YouTube URL when needed."""

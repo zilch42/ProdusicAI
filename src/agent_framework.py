@@ -5,7 +5,7 @@ from langchain_openai import AzureChatOpenAI
 from langgraph.graph import Graph, START, END
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import JsonOutputParser
-from src.rag import get_random_by_category, query_rag, search_youtube_song, _rag_categories
+from src.rag import get_random_by_category, get_ideas_db, search_youtube_song, _rag_categories
 from src.logger import logger
 
 
@@ -96,7 +96,7 @@ async def get_random_idea_rag(state: Dict) -> Dict:
 async def query_vectorstore(state: Dict) -> Dict:
     """Query the vectorstore and add results to state."""
     last_message = state["messages"][-1].content
-    results = await query_rag(last_message, k=3)
+    results = await get_ideas_db(last_message, k=3)
     
     # Return updated state with all existing fields
     return {**state, "rag_results": results}

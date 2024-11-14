@@ -1,12 +1,22 @@
+"""NOT IN USE
+I got most of the way working through this branch. The AI agents were working, but I couldn't get the UI to work with the response without a time out from the javascript scroll lines. 
+ControlFlow takes a lot longer than LangChain. Maybe 2-3x longer. It's much better from a coding experience perspective, but Cursor doesn't really know it at all so isn't much help. 
+"""
+
 import os
 from typing import Any, Dict, List, Sequence, TypedDict, Optional
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain_openai import AzureChatOpenAI
+from langchain.schema import Document  
+from numpy import result_type
 from pydantic import BaseModel
 import controlflow as cf
-from src.rag import get_random_by_category, query_rag, search_youtube_song, _rag_categories
+from src.rag import get_random_by_category, get_ideas_db, search_youtube_song, DocMetadata
 from src.logger import logger
-from src.agent_framework import SPECIALISTS
+
+# cf.settings.log_level = 'DEBUG'
+# cf.settings.tools_verbose = True
+cf.settings.enable_default_print_handler = False
 
 
 class ConversationState(BaseModel):
@@ -22,117 +32,117 @@ class ConversationState(BaseModel):
     is_followup: bool = False
 
 
-try:
-    llm = AzureChatOpenAI(
+def AzureLLM(temperature: float = 0.7) -> AzureChatOpenAI:
+    """Initialize an Azure Chat OpenAI model"""
+    try:
+        llm = AzureChatOpenAI(
         openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
         azure_deployment="gpt-4o",
         azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        api_key=os.getenv("AZURE_OPENAI_API_KEY")
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"), 
+        temperature=temperature
     )
-    cf.defaults.model = llm
-except Exception as e:
-    logger.error(f"Error initializing LLM: {e}")
-    logger.error("Please check your environment variables in `.env`")
-    raise e
+    except Exception as e:
+        logger.error(f"Error initializing LLM: {e}")
+        logger.error("Please check your environment variables in `.env`")
+        raise e
+    return llm
+
 
 # Create specialized agents
 composer_agent = cf.Agent(
     name="Composer",
     description="Expert music composer and modern songwriter",
     instructions="You are an expert music composer and modern songwriter. Provide advice on composition, arrangement, and songwriting. Your specific influences include: Radiohead, Bloc Party, Sylvan Esso, Banks, As Tall as Lions, and Bon Iver.",
-    temperature=0.7
+    model=AzureLLM(temperature=0.7)
 )
 
 mixing_engineer_agent = cf.Agent(
     name="Mixing Engineer",
     description="Expert mixing and mastering engineer",
     instructions="You are an expert mixing and mastering engineer. You studied under Nigel Godrich. Provide advice on mixing, EQ, compression, and other audio processing techniques.",
-    temperature=0.3
+    model=AzureLLM(temperature=0.3)
 )
 
 sound_designer_agent = cf.Agent(
     name="Sound Designer",
     description="Expert sound designer and music producer",
     instructions="You are an expert sound designer and music producer. You studied under Nigel Godrich and Brian Eno. Provide advice on synthesizer programming, sample manipulation, and creating unique sounds.",
-    temperature=0.8
+    model=AzureLLM(temperature=0.8)
 )
 
 lyricist_agent = cf.Agent(
     name="Lyricist",
     description="Expert lyricist",
     instructions="You are an expert lyricist. Provide advice on writing compelling lyrics, developing themes and narratives, crafting hooks, and ensuring lyrics flow well with the music. Your specific influences include: Radiohead, Bloc Party, Sylvan Esso, Banks, As Tall as Lions, and Bon Iver. You enjoy obscure and opaque lyrics, but not everything needs to be complicated.",
-    temperature=0.7
+    model=AzureLLM(temperature=0.7)
 )
 
 song_suggestion_agent = cf.Agent(
     name="Song Suggestion",
     description="Expert song suggestion",
     instructions="You are a music clever with good technical knowledge and a wide range of musical tastes. Provide a good reference song that demonstrates the concept or technique discussed in the previous response.",
-    temperature=0.4, 
-    tools={"search_youtube_song": search_youtube_song}
+    model=AzureLLM(temperature=0.4), 
+    tools=[search_youtube_song]
 )
 
 memory_agent = cf.Agent(
-    name="Memory",
+    name="Past Ideas",
     description="Musical idea database manager",
     instructions="You handle the user's self collected database of previous musical ideas. You can search this database for relevant information to help answer the user's current question. You will need to determine whether the ideas returned from the database are relevant to the user's current question.",
-    temperature=0.3
+    model=AzureLLM(temperature=0.3)
 )
 
 coordinator = cf.Agent(
     name="Coordinator",
     instructions="""You are a project coordinator who routes queries and manages the conversation flow.
     Analyze the query and determine the next best action.""", 
-    temperature=0.4
+    model=AzureLLM(temperature=0.4)
 )
 
 
 @cf.flow
 async def music_production_workflow(message: str, previous_messages: Optional[List[BaseMessage]] = None) -> Dict:
     """Main workflow for handling music production queries"""
-    
-    state = ConversationState(
-        messages=[HumanMessage(content=message)],
-        previous_messages=previous_messages or []
-    )
-    
+        
     # Task 1: Check for relevant RAG results
-    rag_results = cf.Task(
+    rag_results = cf.run(
         "Get any relevant musical ideas stored in the database that are relevant to the user's current question",
-        instructions="""You will need to determine whether the ideas returned from the database are relevant to the user's current question.
-        If they are, you will need to format your response as a numbered list of markdown formatted ideas.""",
-        context=dict(
-            message=message
-        ),
+        instructions="""You will need to determine whether the ideas returned from the database are relevant to the user's current question and filter the list appropriately.""",
+        context=dict(query=message),
+        result_type=list[DocMetadata],
         agents=[memory_agent],
-        tools={"query_rag": query_rag}
+        tools=[get_ideas_db]
     )
 
     # Task 2: Generate response
-    response = cf.Task(
-        "Generate specialist response",
-        context=dict(
-            state=state,
-            rag_results=rag_results,
-            specialists=SPECIALISTS
-        ),
-        agents=[specialist_agent],
-        tools={
-            "search_youtube_song": search_youtube_song
-        }
+    specialist_responder = cf.Task(
+        "Answer the user's query with the most appropriate specialist.",
+        context=dict(query=message),
+        result_type=str, 
+        agents=[coordinator, composer_agent, mixing_engineer_agent, sound_designer_agent, lyricist_agent],
+        completion_agents=[coordinator],   
+    )
+    specialist_response = specialist_responder.run(turn_strategy=cf.orchestration.turn_strategies.Moderated(moderator = coordinator))
+
+    # Task 3: Generate song suggestion
+    song_suggestion = cf.run(
+        "Suggest a reference song that demonstrates the concept or technique discussed by the specialist agent",
+        result_type=TypedDict('SongSuggestion', {'youtube_link': str, 'artist_song': str}),
+        agents=[song_suggestion_agent],
+        depends_on=[specialist_responder]
     )
 
     # Update state with results
     final_state = {
-        "messages": state.messages + [response.result] if not analysis.result.get("is_random") else state.messages,
-        "previous_messages": state.previous_messages + state.messages if not analysis.result.get("is_random") else state.previous_messages,
-        "current_agent": response.result.get("specialist", ""),
-        "rag_results": rag_results.result,
-        "needs_song": response.result.get("needs_song", False),
-        "suggested_song": response.result.get("suggested_song"),
-        "youtube_url": response.result.get("youtube_url"),
-        "is_random": analysis.result.get("is_random", False),
-        "is_followup": analysis.result.get("is_followup", False)
+        "messages": specialist_response,
+        "previous_messages": specialist_response, 
+        "current_agent": "Unsure",
+        "rag_results": rag_results,
+        "suggested_song": song_suggestion.get("artist_song"),
+        "youtube_url": song_suggestion.get("youtube_link"),
+        "is_random": False,
+        "is_followup": False
     }
 
     return final_state

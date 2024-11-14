@@ -2,16 +2,19 @@ import random
 from langchain_chroma import Chroma
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain.schema import Document  
-from src.logger import logger, log_function, log_rag_query
 from googleapiclient.discovery import build
-from dotenv import load_dotenv
 import os
 import pandas as pd
 import numpy as np
 import hashlib
 import asyncio
 import shutil
+from pydantic import BaseModel
+from typing import Optional
+from dotenv import load_dotenv
 load_dotenv()
+
+from src.logger import logger, log_function, log_rag_query
 
 @log_function
 def get_csv_hash():
@@ -20,6 +23,7 @@ def get_csv_hash():
     """
     with open("ideas.csv", "rb") as f:
         return hashlib.sha256(f.read()).hexdigest()
+
 
 @log_function
 async def initialize_rag():
@@ -134,6 +138,7 @@ async def search_youtube_song(query: str) -> str:
     finally:
         youtube.close()
 
+
 def convert_timestamp_to_yt(timestamp: str) -> str:
     """
     Convert a timestamp string to a URL parameter for YouTube.
@@ -146,6 +151,7 @@ def convert_timestamp_to_yt(timestamp: str) -> str:
     except:
         logger.warning(f"Invalid timestamp: {timestamp}")
         return ""
+
 
 @log_function
 async def update_youtube_links(df):
@@ -195,25 +201,35 @@ async def update_youtube_links(df):
 
     return df 
 
+
+class DocMetadata(BaseModel):
+    Category: str
+    Technique: str
+    Description: str
+    Song: Optional[str] = None
+    Link: Optional[str] = None
+    Timestamp: Optional[str] = None
+
+
 @log_rag_query
 @log_function
-async def query_rag(query, k=3):
+async def get_ideas_db(query, k=3) -> list[DocMetadata]:
     """
-    Query the RAG system to find similar documents based on semantic search.
+    Query the RAG db of musical ideas to find similar documents based on semantic search.
 
     Args:
-        query (str): The search query text
+        query (str): The search query 
         k (int, optional): Number of results to return. Defaults to 3.
 
     Returns:
-        list[Document]: List of matching documents ordered by relevance
+        list[DocMetadata]: List of matching documents
     """
     global _vectorstore
     results = await _vectorstore.asimilarity_search(query, k=k)
-    return results
+    return [DocMetadata(**result.metadata) for result in results]
 
 @log_function
-async def get_random_by_category(category: str = None):
+async def get_random_by_category(category: str = None) -> None | DocMetadata:
     """
     Get a random document from the RAG system matching a specific category.
     
@@ -222,7 +238,7 @@ async def get_random_by_category(category: str = None):
             If None, selects from all categories.
         
     Returns:
-        Document | None: A random document from the specified category/categories,
+        DocMetadata | None: A random document from the specified category/categories,
             or None if no matches found
     """
     # For filtering by single category or list of categories
@@ -235,9 +251,8 @@ async def get_random_by_category(category: str = None):
         return None
     
     random_id = random.choice(ids)
-
     record = _vectorstore.get(ids=random_id)
-    return Document(page_content=record['documents'][0], metadata=record['metadatas'][0])
+    return DocMetadata(**record['metadatas'][0])
 
 async def get_category_list():
     """

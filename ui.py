@@ -1,6 +1,5 @@
 from nicegui import ui, app
 from langchain.schema import AIMessage
-from regex import F
 from src.rag import convert_timestamp_to_yt, _rag_categories
 from src.logger import logger, nicegui_handler
 from src.agent_framework import invoke_agent

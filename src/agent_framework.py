@@ -190,7 +190,7 @@ def specialist_response(state: Dict) -> Dict:
 def needs_song_suggestion(state: Dict) -> bool:
     """Determine if a song suggestion is needed based on the specialist's response."""
     song_check_prompt = ChatPromptTemplate.from_messages([
-        SystemMessage("""Analyze the conversation and determine whether it would be useful to provide a song suggestion to demonstrate the concept or technique discussed in the previous response.
+        SystemMessage("""Analyze the conversation and determine whether it would be useful to provide a reference track suggestion to demonstrate the concept or technique discussed in the previous response.
                     Respond ONLY with "YES" or "NO"."""), 
         AIMessage("Previous response: {specialist_response}")
     ])
@@ -208,7 +208,7 @@ def needs_song_suggestion(state: Dict) -> bool:
         needs_song = False
     
     # TODO: This is a hack to get the song suggestion to run every time
-    return {**state, "needs_song": True}
+    return {**state, "needs_song": needs_song}
 
 async def get_song_suggestion(state: Dict) -> Dict:
     """Get song suggestion and YouTube URL when needed."""

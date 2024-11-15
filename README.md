@@ -89,6 +89,10 @@ Key dependencies include:
 
 For a complete list of dependencies, see `pyproject.toml`.
 
-## Contributing
+## Known Issues
+
+- Embedded youtube videos dont work on local host so you will need to set a hostname for the ip you want to view the app on (https://stackoverflow.com/questions/51969269/embedded-youtube-video-doesnt-work-on-local-server)[https://stackoverflow.com/questions/51969269/embedded-youtube-video-doesnt-work-on-local-server] or use NiceGUI's on_air feature and view the app using the temporary url that it provides. This is enabled by default. Note that this will expose the app to the public internet.
+
+## Contributing/Further Development
 
 This is a toy project used to learn about agents and RAG. It is not intended for production use, or likely to be actively maintained, but please feel free to fork it and use it as you see fit.

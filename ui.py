@@ -1,5 +1,6 @@
 from nicegui import ui, app
 from langchain.schema import AIMessage
+from regex import F
 from src.rag import convert_timestamp_to_yt, _rag_categories
 from src.logger import logger, nicegui_handler
 from src.agent_framework import invoke_agent
@@ -146,11 +147,11 @@ def main():
                     sm.props(f'name="{specialist_name}"')
                     ui.markdown(ai_message.content)
                 
-                # If there's a verified YouTube example, show it
-                if result.get("youtube_url"):
-                    logger.info(f"Showing YouTube example: {result['youtube_url']}")
-                    ui.html(create_youtube_embed(result["youtube_url"]))
-                    
+                    # If there's a verified YouTube example, show it
+                    if result.get("youtube_url"):
+                        logger.info(f"Showing YouTube example: {result['youtube_url']}")
+                        ui.html(create_youtube_embed(result["youtube_url"]))
+                        
                 await ui.run_javascript("window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })")
             else:
                 message_container.remove(specialist_message)
@@ -225,5 +226,5 @@ ui.run(title='ProdusicAI',
        favicon='img/logo2.png',
        host='0.0.0.0', 
        port=8001, 
-       reconnect_timeout=20)
+       on_air=True)
         

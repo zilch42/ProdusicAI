@@ -5,7 +5,7 @@ from langchain_openai import AzureChatOpenAI
 from langgraph.graph import Graph, START, END
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import JsonOutputParser
-from src.rag import get_random_by_category, query_rag, search_youtube_song, _rag_categories
+from src.rag import get_random_by_category, get_ideas_db, search_youtube_song, _rag_categories
 from src.logger import logger
 
 
@@ -96,7 +96,7 @@ async def get_random_idea_rag(state: Dict) -> Dict:
 async def query_vectorstore(state: Dict) -> Dict:
     """Query the vectorstore and add results to state."""
     last_message = state["messages"][-1].content
-    results = await query_rag(last_message, k=3)
+    results = await get_ideas_db(last_message, k=3)
     
     # Return updated state with all existing fields
     return {**state, "rag_results": results}
@@ -190,9 +190,7 @@ def specialist_response(state: Dict) -> Dict:
 def needs_song_suggestion(state: Dict) -> bool:
     """Determine if a song suggestion is needed based on the specialist's response."""
     song_check_prompt = ChatPromptTemplate.from_messages([
-        SystemMessage("""Analyze the previous response to determine whether it contains a detailed description of a single technique or a list of techniques offer this suggestions. A list of techniques may be formatted as a numbered markdown list and include more than 2 items:
-                    - If it is a detailed description of a single technique, respond with "YES"
-                    - If it is a list of suggested techniques, respond with "NO"
+        SystemMessage("""Analyze the conversation and determine whether it would be useful to provide a song suggestion to demonstrate the concept or technique discussed in the previous response.
                     Respond ONLY with "YES" or "NO"."""), 
         AIMessage("Previous response: {specialist_response}")
     ])
@@ -209,7 +207,8 @@ def needs_song_suggestion(state: Dict) -> bool:
         logger.error(f"Error parsing song suggestion response: {e}")
         needs_song = False
     
-    return {**state, "needs_song": needs_song}
+    # TODO: This is a hack to get the song suggestion to run every time
+    return {**state, "needs_song": True}
 
 async def get_song_suggestion(state: Dict) -> Dict:
     """Get song suggestion and YouTube URL when needed."""

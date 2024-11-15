@@ -1,4 +1,3 @@
-import os
 from typing import Any, Dict, List, Sequence, TypedDict, Optional
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain_openai import AzureChatOpenAI
@@ -7,25 +6,26 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import JsonOutputParser
 from src.rag import get_random_by_category, get_ideas_db, search_youtube_song, _rag_categories
 from src.logger import logger
+from src.config import get_config
 
 
 
 SPECIALISTS = {
     "composer": {
         "temperature": 0.7,
-        "system_message": SystemMessage(content="You are an expert music composer. Provide advice on composition, arrangement, and songwriting.")
+        "system_message": SystemMessage(content="You are an expert music composer and modern songwriter. Provide advice on composition, arrangement, and songwriting. Your specific influences include: Radiohead, Bloc Party, Sylvan Esso, Banks, As Tall as Lions, and Bon Iver.")
     },
     "mixing_engineer": {
         "temperature": 0.3,
-        "system_message": SystemMessage(content="You are an expert mixing engineer. Provide advice on mixing, EQ, compression, and other audio processing techniques.")
+        "system_message": SystemMessage(content="You are an expert mixing and mastering engineer. You studied under Nigel Godrich. Provide advice on mixing, EQ, compression, and other audio processing techniques.")
     },
     "sound_designer": {
         "temperature": 0.8,
-        "system_message": SystemMessage(content="You are an expert sound designer. Provide advice on synthesizer programming, sample manipulation, and creating unique sounds.")
+        "system_message": SystemMessage(content="You are an expert sound designer and music producer. You studied under Nigel Godrich and Brian Eno. Provide advice on synthesizer programming, sample manipulation, and creating unique sounds.")
     },
     "lyricist": {
         "temperature": 0.7,
-        "system_message": SystemMessage(content="You are an expert lyricist and songwriter. Provide advice on writing compelling lyrics, developing themes and narratives, crafting hooks, and ensuring lyrics flow well with the music.")
+        "system_message": SystemMessage(content="You are an expert lyricist. Provide advice on writing compelling lyrics, developing themes and narratives, crafting hooks, and ensuring lyrics flow well with the music. Your specific influences include: Radiohead, Bloc Party, Sylvan Esso, Banks, As Tall as Lions, and Bon Iver. You enjoy obscure and opaque lyrics, but not everything needs to be complicated.")
     },
     "project_manager": {
         "temperature": 0.4,
@@ -58,13 +58,15 @@ class AgentState(TypedDict):
     is_random: bool
     is_followup: bool
 
+
 # Initialize our LLM
+config = get_config()
 try:
     llm = AzureChatOpenAI(
-        openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-        azure_deployment="gpt-4o",
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        api_key=os.getenv("AZURE_OPENAI_API_KEY")
+        azure_endpoint=config.azure_openai_endpoint,
+        api_key=config.azure_openai_api_key,
+        api_version=config.azure_openai_api_version,
+        azure_deployment="gpt-4o"
     )
 except Exception as e:
     logger.error(f"Error initializing LLM: {e}")
@@ -208,13 +210,13 @@ def needs_song_suggestion(state: Dict) -> bool:
         needs_song = False
     
     # TODO: This is a hack to get the song suggestion to run every time
-    return {**state, "needs_song": needs_song}
+    return {**state, "needs_song": True}
 
 async def get_song_suggestion(state: Dict) -> Dict:
     """Get song suggestion and YouTube URL when needed."""
     song_suggester_prompt = ChatPromptTemplate.from_messages([
-        SystemMessage("""You are an experienced music producer. 
-                    Suggest ONE reference song that demonstrates the concept or technique discussed in the previous response.
+        SystemMessage(""""You are a music clever with good technical knowledge and a wide range of musical tastes. 
+                    Provide a single good reference song that demonstrates the concept or technique discussed in the previous response.
                     Format your response as "SONG_SUGGESTION: Artist - Song Title"."""), 
         ("user", "Previous response: {specialist_response}")
     ])
@@ -333,3 +335,4 @@ async def invoke_agent(message: str, previous_messages: Optional[Sequence[BaseMe
     if any(isinstance(msg, AIMessage) for msg in result["messages"]):
         result["previous_messages"] += result["messages"]
     return result
+

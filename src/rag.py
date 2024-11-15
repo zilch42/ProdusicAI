@@ -2,7 +2,6 @@ import random
 from langchain_chroma import Chroma
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain.schema import Document  
-from googleapiclient.discovery import build
 import os
 import pandas as pd
 import numpy as np
@@ -10,14 +9,15 @@ import hashlib
 import asyncio
 import shutil
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from dotenv import load_dotenv
 load_dotenv()
 
 from src.logger import logger, log_function, log_rag_query
+from src.youtube import search_youtube_song
 
 @log_function
-def get_csv_hash():
+def get_csv_hash() -> str:
     """
     Calculate SHA-256 hash of ideas.csv file.
     """
@@ -26,7 +26,7 @@ def get_csv_hash():
 
 
 @log_function
-async def initialize_rag():
+async def initialize_rag() -> Chroma:
     """
     Initialize a RAG (Retrieval-Augmented Generation) system.
 
@@ -66,7 +66,7 @@ async def initialize_rag():
 
     # Text to be embedded 
     # Combine relevant columns into text for embedding
-    documents = []
+    documents: List[Document] = []
     for idx, row in df.iterrows():
         text = f"Category: {row['Category']}\nTechnique: {row['Technique']}\nDescription: {row['Description']}"
         metadata = row.to_dict()
@@ -94,67 +94,8 @@ async def initialize_rag():
     return vectorstore
 
 
-async def search_youtube_song(query: str) -> str:
-    """
-    Search for a song on YouTube and return its URL.
-    
-    Args:
-        query (str): The search query for the song (e.g. Artist - Title)
-        
-    Returns:
-        str: YouTube video URL, None if no video found
-        
-    Raises:
-        Exception: If there's an error during the YouTube API request
-    """
-    try:
-        youtube = build('youtube', 'v3', developerKey=os.getenv("YOUTUBE_API_KEY"), cache_discovery=False)
-        
-        if "remix" not in query.lower():
-            query = f"{query} official"
-
-        # Perform the search
-        logger.info(f"Searching YouTube for: {query}")
-        search_response = youtube.search().list(
-            q=query,
-            part='id,snippet',
-            maxResults=1,
-            type='video'
-        ).execute()
-        
-        # Get the video ID from the response
-        if search_response['items']:
-            video_id = search_response['items'][0]['id']['videoId']
-            video_url = f"https://www.youtube.com/watch?v={video_id}"
-            logger.info(f"Found YouTube video: {video_url}")                
-            return video_url
-        else:
-            logger.warning(f"No YouTube videos found for query: {query}")
-            return None
-            
-    except Exception as e:
-        logger.error(f"Error searching YouTube: {str(e)}")
-        raise
-    finally:
-        youtube.close()
-
-
-def convert_timestamp_to_yt(timestamp: str) -> str:
-    """
-    Convert a timestamp string to a URL parameter for YouTube.
-    """
-    try:
-        minutes, seconds = map(int, str(timestamp).split(':'))
-        t_seconds = minutes * 60 + seconds
-        ts = f"&amp;start={t_seconds}"
-        return ts
-    except:
-        logger.warning(f"Invalid timestamp: {timestamp}")
-        return ""
-
-
 @log_function
-async def update_youtube_links(df):
+async def update_youtube_links(df: pd.DataFrame) -> pd.DataFrame:
     """
     Update YouTube links in the DataFrame for entries that have songs but no links.
     
@@ -183,7 +124,7 @@ async def update_youtube_links(df):
                 if isinstance(record.Timestamp, str) and record.Timestamp.startswith('['):
                     timestamps = eval(record.Timestamp)
                 else:
-                    timestamps = [None]*len(songs)    
+                    timestamps = [None] * len(songs)    
                 links = []
                 for song, timestamp in zip(songs, timestamps):
                     link = await search_youtube_song(song)
@@ -213,7 +154,7 @@ class DocMetadata(BaseModel):
 
 @log_rag_query
 @log_function
-async def get_ideas_db(query, k=3) -> list[DocMetadata]:
+async def get_ideas_db(query: str, k: int = 3) -> List[DocMetadata]:
     """
     Query the RAG db of musical ideas to find similar documents based on semantic search.
 
@@ -228,8 +169,9 @@ async def get_ideas_db(query, k=3) -> list[DocMetadata]:
     results = await _vectorstore.asimilarity_search(query, k=k)
     return [DocMetadata(**result.metadata) for result in results]
 
+
 @log_function
-async def get_random_by_category(category: str = None) -> None | DocMetadata:
+async def get_random_by_category(category: Optional[str] = None) -> Optional[DocMetadata]:
     """
     Get a random document from the RAG system matching a specific category.
     
@@ -254,7 +196,8 @@ async def get_random_by_category(category: str = None) -> None | DocMetadata:
     record = _vectorstore.get(ids=random_id)
     return DocMetadata(**record['metadatas'][0])
 
-async def get_category_list():
+
+async def get_category_list() -> List[str]:
     """
     Get a unique list of all categories from the vector store metadata.
 

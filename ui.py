@@ -1,29 +1,29 @@
+from ast import literal_eval
 from nicegui import ui, app
 from langchain.schema import AIMessage
-from src.rag import convert_timestamp_to_yt, _rag_categories
+from src.rag import _rag_categories
 from src.logger import logger, nicegui_handler
 from src.agent_framework import invoke_agent
+from src.youtube import create_youtube_embed, convert_timestamp_to_yt
+from src.config import get_config
 
 app.add_static_files('/img', 'img')
 
-def create_youtube_embed(url: str, timestamp: str = "") -> str:
-    """Create an HTML iframe for a YouTube URL."""
-    video_id = url.split('=')[-1]
-    html = f"""
-<iframe 
-    width="560" height="315" 
-    src="https://www.youtube.com/embed/{video_id}?si=dTVYtHXBIJeY_EH-{timestamp}" 
-    title="YouTube video player" frameborder="0" 
-    allow="clipboard-write; encrypted-media; picture-in-picture" 
-    referrerpolicy="no-referrer-when-downgrade" 
-    allowfullscreen>
-</iframe>
-    """
-    print(html)
-    return html
+def init_app() -> bool:
+    """Initialize the application."""
+    try:
+        config = get_config()
+        logger.info("Application initialized successfully")
+        return True
+    except ValueError as e:
+        logger.error(f"Failed to initialize application: {e}")
+        return False
 
 @ui.page('/')
-def main():
+def main() -> None:
+    if not init_app():
+        return ui.markdown("# ⚠️ Configuration Error\nPlease check your environment variables and logs.")
+    
     """Main application page that sets up the chat interface.
     
     Creates a tabbed interface with two panels:
@@ -51,9 +51,9 @@ def main():
     nicegui_handler.set_log_element(log_element)
     
     # Initialize previous_messages list at the start of main()
-    previous_messages = []
+    previous_messages: list = []
     
-    def reset_conversation():
+    def reset_conversation() -> None:
         """Clear the chat history and restore suggested prompts."""
         message_container.clear()
         previous_messages.clear()
@@ -70,7 +70,7 @@ def main():
         - Managing UI elements (spinners, scroll behavior)
         """
         nonlocal previous_messages 
-        user_message = text.value
+        user_message: str = text.value
         if not user_message:
             return
         
@@ -101,7 +101,7 @@ def main():
         suggested_prompts_container.clear()
 
         # Create and store the new human message
-        result = await invoke_agent(user_message, previous_messages=previous_messages)
+        result: dict = await invoke_agent(user_message, previous_messages=previous_messages)
         previous_messages = result["previous_messages"]
 
         # Show RAG results only if not a followup question
@@ -121,9 +121,9 @@ def main():
                     if doc.Link:
                         link = doc.Link
                         if isinstance(link, str) and link.startswith('['):
-                            links = eval(link)
+                            links = literal_eval(link)
                             timestamps = doc.Timestamp
-                            timestamps = eval(timestamps) if timestamps else [""]*len(links)
+                            timestamps = literal_eval(timestamps) if timestamps else [""]*len(links)
                             for youtube_link, ts in zip(links, timestamps):
                                 ts_param = convert_timestamp_to_yt(ts)
                                 ui.html(create_youtube_embed(youtube_link, ts_param))
@@ -161,7 +161,7 @@ def main():
     # Suggested prompts container
     suggested_prompts_container = ui.column().classes('w-full max-w-2xl mx-auto my-6 items-center')
 
-    def show_suggested_prompts(which: str = "all"):
+    def show_suggested_prompts(which: str = "all") -> None:
         """Display two sections of clickable prompt suggestions:
         - Random ideas from the RAG database
         - Quick start chat prompts for common questions
@@ -175,7 +175,7 @@ def main():
             "What chord progressions sound like Radiohead?"
         ]
         
-        def display_prompt_cards(text_list, prefix: str = ""):
+        def display_prompt_cards(text_list: list, prefix: str = "") -> None:
             """Display a list of clickable prompt cards.
             
             Args:
@@ -204,7 +204,7 @@ def main():
                     ui.label("Quick start chat prompts:").classes('q-ma-md').style('font-size: 200%; font-weight: 300')
                 display_prompt_cards(prompts)
 
-    async def enter_prompt(prompt: str):
+    async def enter_prompt(prompt: str) -> None:
         """Handle when a suggested prompt is clicked."""
         text.value = prompt
         suggested_prompts_container.clear()
@@ -226,4 +226,3 @@ ui.run(title='ProdusicAI',
        host='0.0.0.0', 
        port=8001, 
        on_air=True)
-        

@@ -91,7 +91,7 @@ For a complete list of dependencies, see `pyproject.toml`.
 
 ## Known Issues
 
-- Embedded youtube videos dont work on local host so you will need to set a hostname for the ip you want to view the app on (https://stackoverflow.com/questions/51969269/embedded-youtube-video-doesnt-work-on-local-server)[https://stackoverflow.com/questions/51969269/embedded-youtube-video-doesnt-work-on-local-server] or use NiceGUI's on_air feature and view the app using the temporary url that it provides. This is enabled by default. Note that this will expose the app to the public internet.
+- Embedded youtube videos dont work on local host so you will need to set a hostname for the ip you want to view the app on [https://stackoverflow.com/questions/51969269/embedded-youtube-video-doesnt-work-on-local-server](https://stackoverflow.com/questions/51969269/embedded-youtube-video-doesnt-work-on-local-server) or use NiceGUI's on_air feature and view the app using the temporary url that it provides. This is enabled by default. Note that this will expose the app to the public internet.
 
 ## Contributing/Further Development
 

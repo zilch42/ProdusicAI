@@ -75,7 +75,7 @@ async def initialize_rag():
 
     embedding_model = HuggingFaceBgeEmbeddings(
         model_name="BAAI/llm-embedder",
-        model_kwargs={"device": "cuda"},
+        model_kwargs={"device": "cpu"},
         encode_kwargs={"normalize_embeddings": True},
     )
 
